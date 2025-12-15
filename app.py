@@ -32,10 +32,10 @@ VIDEO_DB = {
 }
 
 def get_direct_link(google_link):
-    """Zamienia link podglądu na link bezpośredniego pobierania (oryginalna jakość)"""
+    """Zamienia link podglądu na link bezpośredniego pobierania"""
     try:
         file_id = google_link.split('/d/')[1].split('/')[0]
-        return f"https://drive.google.com/uc?export=download&id={file_id}"
+        return f"https://drive.google.com/uc?export=download&confirm=t&id={file_id}"
     except IndexError:
         return google_link
 
