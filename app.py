@@ -63,7 +63,7 @@ direct_link = get_direct_link(raw_link)
 
 # Wyświetlamy
 st.subheader("🎥 Oglądasz losową sekwencję")
-st.video(direct_link)
+st.video(direct_link, format="video/mp4")
 
 st.markdown("---")
 
