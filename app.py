@@ -21,7 +21,7 @@ def save_to_google_sheets(video_code, rating):
         client = gspread.authorize(creds)
         
         # Otwieramy arkusz
-        sheet = client.open(SHEET_URL).sheet1  # sheet1 to pierwsza zakładka
+        sheet = client.open_by_url(SHEET_URL).sheet1  # sheet1 to pierwsza zakładka
         
         # Pobieramy aktualną datę
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
