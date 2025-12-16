@@ -353,3 +353,26 @@ else:
             st.rerun()
             
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
+
+
+# --- SEKCJA RATUNKOWA (FIX NA ZACIĘCIA) ---
+    st.write("")
+    st.write("")
+    # Używamy expandera, żeby nie rozpraszał użytkownika, jeśli wszystko działa dobrze
+    with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
+        st.warning("Użyj tego przycisku TYLKO jeśli ekran zaciął się na komunikacie 'Ładowanie kolejnego...' lub wideo nie chce się załadować.")
+        
+        if st.button("🆘 WYMUŚ NASTĘPNE WIDEO"):
+            # 1. Zabezpieczenie: uznajemy obecne wideo za "zaliczone", żeby nie wróciło
+            if st.session_state.current_code and st.session_state.current_code not in st.session_state.watched_videos:
+                st.session_state.watched_videos.append(st.session_state.current_code)
+            
+            # 2. Resetujemy kluczowe flagi stanu
+            st.session_state.rated = False       # Reset flagi oceny
+            st.session_state.video_ended = False # Reset flagi końca wideo
+            
+            # 3. Wymuszamy losowanie nowego wideo
+            losuj_nowe()
+            
+            # 4. Twarde odświeżenie strony
+            st.rerun()
