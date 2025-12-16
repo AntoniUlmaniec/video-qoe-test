@@ -1,6 +1,11 @@
 import streamlit as st
 import random
+import streamlit.components.v1 as components
 
+# --- KONFIGURACJA STRONY ---
+st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
+
+# --- DANE KONFIGURACYJNE ---
 BASE_URL = "https://github.com/AntoniUlmaniec/video-qoe-test/releases/download/v1.0/"
 FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeBmQlBJMBmLk4kSiJ7EYgWlhpUyCz1wPuNjTYHXDPF1T7-Mw/viewform"
 ENTRY_ID = "entry.2143728072"
@@ -32,18 +37,19 @@ VIDEO_MAP = {
     "SEQ_24": "out_sintelDragons_480x270_250k_withAD.mp4"
 }
 
+# --- LOGIKA STANU (Session State) ---
 if 'current_code' not in st.session_state:
     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
 
 def losuj_nowe():
     lista_kodow = list(VIDEO_MAP.keys())
     nowy_kod = random.choice(lista_kodow)
+    # Zabezpieczenie przed wylosowaniem tego samego dwa razy pod rząd
     while len(lista_kodow) > 1 and nowy_kod == st.session_state.current_code:
         nowy_kod = random.choice(lista_kodow)
     st.session_state.current_code = nowy_kod
 
-st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
-
+# --- INTERFEJS UŻYTKOWNIKA ---
 st.title("Badanie Jakosci Wideo (QoE)")
 st.info("Twoim zadaniem jest obejrzec wyswietlony klip i ocenic jego jakosc.")
 
@@ -53,8 +59,7 @@ video_url = BASE_URL + filename
 
 st.subheader(f"Sekwencja testowa: {code}")
 
-# --- SEKCJA HTML/JS DLA WIDEO ---
-# Używamy HTML zamiast st.video, żeby mieć pełną kontrolę nad JavaScriptem
+# --- SEKCJA HTML/JS DLA WIDEO (MODYFIKACJA BLOKADY ESC) ---
 video_html = f"""
 <style>
     /* Stylizacja przycisku startowego */
@@ -76,20 +81,39 @@ video_html = f"""
     #start-btn:hover {{
         background-color: #FF2B2B;
     }}
+
+    /* Overlay - czyli nasza "nakładka" pełnoekranowa */
+    #video-overlay {{
+        display: none;          /* Domyślnie ukryty */
+        position: fixed;        /* Przyklejony do okna */
+        top: 0;
+        left: 0;
+        width: 100vw;           /* 100% szerokości widoku */
+        height: 100vh;          /* 100% wysokości widoku */
+        background-color: black;
+        z-index: 999999;        /* Zawsze na wierzchu */
+        text-align: center;
+    }}
+
+    /* Styl samego wideo wewnątrz nakładki */
+    #my-video {{
+        width: 100%;
+        height: 100%;
+        object-fit: contain;    /* Skalowanie bez obcinania (czarne pasy) */
+        outline: none;
+    }}
+    
     /* Ukrycie paska przewijania w wideo */
     video::-webkit-media-controls-timeline {{
         display: none !important;
     }}
-    /* Ukrycie wideo na początku */
-    #my-video {{
-        display: none;
-        width: 100%;
-    }}
 </style>
 
-<div id="video-container">
-    <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO (FULLSCREEN)</button>
-    
+<div id="controls-container">
+    <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO (Pełny ekran)</button>
+</div>
+
+<div id="video-overlay">
     <video id="my-video" controlsList="nodownload noplaybackrate">
         <source src="{video_url}" type="video/mp4">
         Twoja przeglądarka nie obsługuje wideo.
@@ -97,41 +121,40 @@ video_html = f"""
 </div>
 
 <script>
+    var video = document.getElementById("my-video");
+    var overlay = document.getElementById("video-overlay");
+
     function startVideo() {{
-        var video = document.getElementById("my-video");
-        var btn = document.getElementById("start-btn");
+        // 1. Pokaż nakładkę (zasłania wszystko czarnym tłem)
+        overlay.style.display = "block";
         
-        // 1. Pokaż wideo, ukryj przycisk
-        video.style.display = "block";
-        btn.style.display = "none";
-        
-        // 2. Zacznij odtwarzać
+        // 2. Uruchom wideo
         video.play();
         
-        // 3. Wymuś pełny ekran (musi być wywołane przez kliknięcie!)
-        if (video.requestFullscreen) {{
-            video.requestFullscreen();
-        }} else if (video.webkitRequestFullscreen) {{ /* Safari */
-            video.webkitRequestFullscreen();
-        }} else if (video.msRequestFullscreen) {{ /* IE11 */
-            video.msRequestFullscreen();
-        }}
+        // UWAGA: Nie używamy video.requestFullscreen(), 
+        // dzięki temu ESC nie działa systemowo.
     }}
     
-    // Opcjonalnie: Wyłącz pełny ekran gdy film się skończy
-    document.getElementById("my-video").addEventListener('ended', function(e) {{
-        if (document.exitFullscreen) {{
-            document.exitFullscreen();
-        }} else if (document.webkitExitFullscreen) {{
-            document.webkitExitFullscreen();
+    // 3. Gdy wideo się skończy -> Ukryj nakładkę
+    video.addEventListener('ended', function(e) {{
+        overlay.style.display = "none";
+    }});
+
+    // 4. Dodatkowa blokada przycisku ESC (dla pewności)
+    // Jeśli użytkownik naciśnie ESC, skrypt spróbuje zablokować akcję.
+    document.addEventListener('keydown', function(e) {{
+        if (e.key === "Escape" || e.keyCode === 27) {{
+            e.preventDefault();
+            console.log("Przycisk ESC zablokowany - czekaj na koniec wideo.");
+            return false;
         }}
     }});
 </script>
 """
 
-# Renderowanie HTML
-st.components.v1.html(video_html, height=400)
-
+# Renderowanie HTML - zwiększamy height komponentu, żeby przycisk był wygodny, 
+# ale samo wideo i tak "wyskoczy" poza ten obszar dzięki position: fixed.
+components.html(video_html, height=100)
 
 st.markdown("---")
 
