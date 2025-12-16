@@ -7,18 +7,21 @@ from datetime import datetime
 import streamlit.components.v1 as components
 import time
 
+# --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
 # --- KONFIGURACJA GOOGLE SHEETS ---
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=310694828#gid=310694828"
 
 def get_google_sheet_client():
+    """Pomocnicza funkcja do autoryzacji."""
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
     client = gspread.authorize(creds)
     return client
 
 def save_new_user(age, gender, experience, vision, environment, device):
+    """Tworzy nowego użytkownika, generuje ID i zapisuje w zakładce 'Uczestnicy'."""
     try:
         client = get_google_sheet_client()
         sheet = client.open_by_url(SHEET_URL).worksheet("Uczestnicy")
@@ -33,15 +36,16 @@ def save_new_user(age, gender, experience, vision, environment, device):
         st.error(f"Błąd zapisu użytkownika: {e}")
         return None
 
-def save_rating(user_id, video_code, rating):
+def save_rating(user_id, video_filename, rating):
+    """Zapisuje ocenę wideo w zakładce 'Wyniki'."""
     try:
         client = get_google_sheet_client()
         sheet = client.open_by_url(SHEET_URL).worksheet("Wyniki")
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Zapis: User_ID, Data, Kod Wideo, Ocena
-        sheet.append_row([user_id, timestamp, video_code, rating])
+        # Zapis: User_ID, Data, NAZWA PLIKU, Ocena
+        sheet.append_row([user_id, timestamp, video_filename, rating])
         return True
     except Exception as e:
         st.error(f"Błąd zapisu oceny: {e}")
@@ -82,7 +86,6 @@ if 'intro_accepted' not in st.session_state:
     st.session_state.intro_accepted = False
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
-# Nowa flaga - czy wideo zostało obejrzane do końca?
 if 'video_ended' not in st.session_state:
     st.session_state.video_ended = False
 
@@ -163,7 +166,6 @@ elif st.session_state.user_id is None:
                     st.session_state.user_id = uid
                     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
                     st.session_state.rated = False
-                    # Resetujemy flagę końca filmu przy starcie
                     st.session_state.video_ended = False
                     st.rerun()
 
@@ -195,20 +197,7 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    
-    if not st.session_state.video_ended:
-        # Pusty kontener na przycisk (zostanie wypełniony, jeśli JS nie zadziała od razu)
-        placeholder = st.empty()
-        
-        # Przycisk zmienia stan session_state i przeładowuje stronę
-        if placeholder.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
-            st.session_state.video_ended = True
-            st.rerun()
-            
-        # CSS ukrywający ten przycisk (opcjonalne - usuń linię poniżej, jeśli chcesz widzieć przycisk)
-        st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
-    
-    
+    # --- PLAYER WIDEO ---
     video_html = f"""
     <style>
         #start-btn {{
@@ -241,28 +230,22 @@ else:
         }}
         
         document.getElementById("my-video").addEventListener('ended', function(e) {{
-            // 1. Zamknij fullscreen
             if (document.exitFullscreen) {{ document.exitFullscreen(); }}
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
-            // 2. Szukaj przycisku Streamlit i kliknij go
-            // Musimy wyjść z ramki (iframe) do głównego dokumentu
             setTimeout(function() {{
                 var buttons = window.parent.document.getElementsByTagName("button");
                 for (var i = 0; i < buttons.length; i++) {{
-                    // Szukamy przycisku po jego tekście
                     if (buttons[i].innerText.includes("Kliknij tutaj jeśli ankieta")) {{
                         buttons[i].click();
                         break;
                     }}
                 }}
-            }}, 500); // Małe opóźnienie dla pewności
+            }}, 500);
         }});
     </script>
     """
     
-    # Wyświetlamy wideo tylko jeśli jeszcze nie zakończono oglądania
-    # (Możesz usunąć 'if', jeśli wideo ma zostać widoczne nad ankietą)
     if not st.session_state.video_ended:
         components.html(video_html, height=100)
     else:
@@ -270,7 +253,7 @@ else:
 
     st.markdown("---")
 
-    # --- OCENA (POJAWIA SIĘ DOPIERO GDY VIDEO_ENDED = TRUE) ---
+    # --- OCENA ---
     
     if st.session_state.video_ended:
         st.header("Twoja ocena")
@@ -294,5 +277,14 @@ else:
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
     else:
-        # Pusty placeholder, żeby strona nie skakała
         st.write("Ankieta pojawi się po zakończeniu wideo.")
+        
+        # --- PRZENIESIONY PRZYCISK AWARYJNY ---
+        # Znajduje się teraz tutaj, pod napisem.
+        if st.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
+            st.session_state.video_ended = True
+            st.rerun()
+            
+        # Zostawiamy ten styl, chociaż po przeniesieniu przycisku może on nie zadziałać idealnie 
+        # (przycisk może stać się widoczny), co w tym miejscu jest akurat pożądane jako fallback.
+        st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
