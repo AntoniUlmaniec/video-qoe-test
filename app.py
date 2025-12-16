@@ -178,7 +178,7 @@ elif st.session_state.user_id is None:
     
     with st.form("demographics_form"):
         wiek = st.selectbox("Jaki jest Twój wiek?", 
-                        ["< 18", "18-24", "25-29", "30-39", "40-49", "50-59", "60-69", "70+"])
+                            ["< 18", "18-24", "25-29", "30-39", "40-49", "50-59", "60-69", "70+"])
 
         st.markdown("---")
         
@@ -228,7 +228,7 @@ else:
 
     code = st.session_state.current_code
     
-    # Licznik postępu (opcjonalny, dla informacji użytkownika)
+    # Licznik postępu
     progress_count = len(st.session_state.watched_videos) + 1
     total_videos = len(VIDEO_MAP)
 
@@ -243,7 +243,7 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO (Zaktualizowany JS) ---
+    # --- PLAYER WIDEO ---
     video_html = f"""
     <style>
         #start-btn {{
@@ -300,12 +300,10 @@ else:
             if (document.exitFullscreen) {{ document.exitFullscreen(); }}
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
-            // --- AUTOMATYCZNE PRZEJŚCIE (Szukamy ukrytego przycisku) ---
             setTimeout(function() {{
                 var buttons = window.parent.document.getElementsByTagName("button");
                 for (var i = 0; i < buttons.length; i++) {{
-                    // JS szuka przycisku o kodowej nazwie ###AUTO_NEXT###
-                    if (buttons[i].innerText.includes("###AUTO_NEXT###")) {{
+                    if (buttons[i].innerText.includes("Kliknij tutaj jeśli ankieta")) {{
                         buttons[i].click();
                         break;
                     }}
@@ -315,18 +313,16 @@ else:
     </script>
     """
     
-    # Wyświetlamy player tylko jeśli wideo się nie skończyło
     if not st.session_state.video_ended:
-        components.html(video_html, height=400) # Zwiększyłem wysokość dla wygody
+        components.html(video_html, height=100)
     else:
         st.success("Wideo zakończone. Proszę wypełnić ankietę poniżej.")
 
     st.markdown("---")
 
-    # --- OCENA I LOGIKA PRZEJŚCIA ---
+    # --- OCENA ---
     
     if st.session_state.video_ended:
-        # === EKRAN OCENY (Po zakończeniu wideo) ===
         st.header("Twoja ocena")
         if not st.session_state.rated:
             with st.form("rating_form"):
@@ -349,74 +345,37 @@ else:
                             st.rerun()
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
-
     else:
-        # === EKRAN OCZEKIWANIA / UKRYTY PRZYCISK (W trakcie wideo) ===
-        st.write("Ankieta pojawi się automatycznie po zakończeniu wideo.")
+        st.write("Ankieta pojawi się po zakończeniu wideo.")
         
-        # --- UKRYTY MECHANIZM AUTOMATYCZNEGO PRZEJŚCIA ---
-        # Ten przycisk jest klikany przez JavaScript (powyżej) po zakończeniu filmu.
-        
-        # 1. Tworzymy przycisk o unikalnej nazwie kodowej
-        # Używamy kolumn, żeby "zepchnąć" go na bok (choć i tak będzie ukryty)
-        chk_col1, chk_col2 = st.columns([0.1, 99.9])
-        with chk_col1:
-            if st.button("###AUTO_NEXT###", key="auto_trigger_btn"): 
-                st.session_state.video_ended = True
-                st.rerun()
+        # Ukryty przycisk, który jest "klikany" przez JavaScript po zakończeniu filmu
+        if st.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
+            st.session_state.video_ended = True
+            st.rerun()
+            
+        st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
 
-        # 2. Kod CSS/JS sprawiający, że przycisk jest totalnie niewidoczny i nieklikalny dla człowieka
-        st.markdown("""
-            <script>
-                // Dodatkowe zabezpieczenie JS - ukrywa przycisk natychmiast po załadowaniu
-                const buttons = window.parent.document.getElementsByTagName("button");
-                for (const btn of buttons) {
-                    if (btn.innerText.includes("###AUTO_NEXT###")) {
-                        btn.style.opacity = "0";
-                        btn.style.position = "absolute"; 
-                        btn.style.height = "0px";
-                        btn.style.width = "0px";
-                        btn.style.padding = "0px";
-                        btn.style.border = "none";
-                        btn.style.pointerEvents = "none"; // Blokuje kliknięcia myszką przez człowieka
-                        btn.style.zIndex = "-1";
-                    }
-                }
-            </script>
-            <style>
-                /* Ukrywanie kontenera przycisku w CSS */
-                div[data-testid="stVerticalBlock"] > div:has(button div p:contains('###AUTO_NEXT###')) {
-                    display: none;
-                }
-                /* Alternatywa dla starszych przeglądarek */
-                button:has(p:contains('###AUTO_NEXT###')) {
-                    display: none;
-                }
-            </style>
-        """, unsafe_allow_html=True)
-
-    # --- SEKCJA RATUNKOWA (PEŁNY RESET ZADANIA) ---
-    st.write("")
+# --- SEKCJA RATUNKOWA (PEŁNY RESET WIDEO) ---
     st.write("")
     st.write("")
     
     with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
         st.warning("""
-        Użyj tego przycisku TYLKO, jeśli ekran zaciął się po ocenie lub wideo nie działa/nie ładuje się.
+        Użyj tego przycisku, jeśli ekran zaciął się po ocenie lub wideo nie działa.
         
-        ⚠️ **UWAGA:** Kliknięcie przycisku ZRESETUJE obecne zadanie. 
-        Będziesz musiał(a) **obejrzeć to wideo od nowa**, aby ankieta pojawiła się ponownie.
+        ⚠️ UWAGA: Kliknięcie przycisku ZRESETUJE obecne zadanie. 
+        Będziesz musiał(a) **obejrzeć wideo od nowa**, aby ankieta pojawiła się ponownie.
         """)
         
-        if st.button("🔄 ZRESETUJ ZADANIE (Wymaga ponownego obejrzenia)"):
+        if st.button("🔄 ZRESETUJ WIDEO (Wymaga ponownego obejrzenia)"):
             # 1. Resetujemy status oceny (żeby zniknął komunikat "Wideo ocenione")
             st.session_state.rated = False
             
-            # 2. Resetujemy status zakończenia wideo
+            # 2. Resetujemy status zakończenia wideo (TO JEST KLUCZOWE)
             # Ustawienie False sprawia, że Streamlit ukryje formularz, a pokaże znowu Player HTML.
             st.session_state.video_ended = False
             
-            # 3. Nie zmieniamy kodu wideo - użytkownik zostaje na tym samym pliku.
+            # 3. Nie zmieniamy kodu wideo - zostajemy na tym samym pliku.
             
             # 4. Przeładowanie strony - user zobaczy znowu przycisk "ODTWÓRZ WIDEO"
             st.rerun()
