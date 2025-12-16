@@ -35,16 +35,12 @@ VIDEO_MAP = {
 if 'current_code' not in st.session_state:
     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
 
-if 'video_playing' not in st.session_state:
-    st.session_state.video_playing = False
-
 def losuj_nowe():
     lista_kodow = list(VIDEO_MAP.keys())
     nowy_kod = random.choice(lista_kodow)
     while len(lista_kodow) > 1 and nowy_kod == st.session_state.current_code:
         nowy_kod = random.choice(lista_kodow)
     st.session_state.current_code = nowy_kod
-    st.session_state.video_playing = False
 
 st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
@@ -57,30 +53,85 @@ video_url = BASE_URL + filename
 
 st.subheader(f"Sekwencja testowa: {code}")
 
-if not st.session_state.video_playing:
-    if st.button("Odtwórz wideo"):
-        st.session_state.video_playing = True
-        st.rerun()
-else:
-    video_html = f"""
-    <style>
-        video::-webkit-media-controls-timeline {{
-            display: none !important;
-        }}
-    </style>
-    <video width="100%" controls autoplay name="media">
+# --- SEKCJA HTML/JS DLA WIDEO ---
+# Używamy HTML zamiast st.video, żeby mieć pełną kontrolę nad JavaScriptem
+video_html = f"""
+<style>
+    /* Stylizacja przycisku startowego */
+    #start-btn {{
+        background-color: #FF4B4B;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        width: 100%;
+        font-weight: bold;
+    }}
+    #start-btn:hover {{
+        background-color: #FF2B2B;
+    }}
+    /* Ukrycie paska przewijania w wideo */
+    video::-webkit-media-controls-timeline {{
+        display: none !important;
+    }}
+    /* Ukrycie wideo na początku */
+    #my-video {{
+        display: none;
+        width: 100%;
+    }}
+</style>
+
+<div id="video-container">
+    <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO (FULLSCREEN)</button>
+    
+    <video id="my-video" controlsList="nodownload noplaybackrate">
         <source src="{video_url}" type="video/mp4">
+        Twoja przeglądarka nie obsługuje wideo.
     </video>
-    <script>
-        const video = document.querySelector('video');
-        if (video) {{
-            video.requestFullscreen().catch(err => {{
-                console.log("Fullscreen blocked by browser");
-            }});
+</div>
+
+<script>
+    function startVideo() {{
+        var video = document.getElementById("my-video");
+        var btn = document.getElementById("start-btn");
+        
+        // 1. Pokaż wideo, ukryj przycisk
+        video.style.display = "block";
+        btn.style.display = "none";
+        
+        // 2. Zacznij odtwarzać
+        video.play();
+        
+        // 3. Wymuś pełny ekran (musi być wywołane przez kliknięcie!)
+        if (video.requestFullscreen) {{
+            video.requestFullscreen();
+        }} else if (video.webkitRequestFullscreen) {{ /* Safari */
+            video.webkitRequestFullscreen();
+        }} else if (video.msRequestFullscreen) {{ /* IE11 */
+            video.msRequestFullscreen();
         }}
-    </script>
-    """
-    st.markdown(video_html, unsafe_allow_html=True)
+    }}
+    
+    // Opcjonalnie: Wyłącz pełny ekran gdy film się skończy
+    document.getElementById("my-video").addEventListener('ended', function(e) {{
+        if (document.exitFullscreen) {{
+            document.exitFullscreen();
+        }} else if (document.webkitExitFullscreen) {{
+            document.webkitExitFullscreen();
+        }}
+    }});
+</script>
+"""
+
+# Renderowanie HTML
+st.components.v1.html(video_html, height=400)
+
 
 st.markdown("---")
 
