@@ -355,7 +355,7 @@ else:
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
 
 
-st.write("")
+    st.write("")
     st.write("")
     
     with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
