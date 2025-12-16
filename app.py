@@ -265,51 +265,51 @@ else:
     </div>
 
     <script>
-        function startVideo() {{
+        function startVideo() {
             var video = document.getElementById("my-video");
             var btn = document.getElementById("start-btn");
             video.style.display = "block";
             btn.style.display = "none";
             video.play();
-            if (video.requestFullscreen) {{ video.requestFullscreen(); }}
-            else if (video.webkitRequestFullscreen) {{ video.webkitRequestFullscreen(); }}
-        }}
+            if (video.requestFullscreen) { video.requestFullscreen(); }
+            else if (video.webkitRequestFullscreen) { video.webkitRequestFullscreen(); }
+        }
 
-        function checkFullscreen() {{
+        function checkFullscreen() {
             var video = document.getElementById("my-video");
             var btn = document.getElementById("start-btn");
             
             if (!document.fullscreenElement && !document.webkitFullscreenElement && 
-                !document.mozFullScreenElement && !document.msFullscreenElement) {{
+                !document.mozFullScreenElement && !document.msFullscreenElement) {
                 
-                if (!video.ended) {{
+                if (!video.ended) {
                     video.pause();
                     video.style.display = "none";
                     btn.style.display = "inline-block";
                     btn.innerHTML = "KONTYNUUJ ODTWARZANIE";
-                }}
-            }}
-        }}
+                }
+            }
+        }
 
         document.addEventListener('fullscreenchange', checkFullscreen);
         document.addEventListener('webkitfullscreenchange', checkFullscreen);
         document.addEventListener('mozfullscreenchange', checkFullscreen);
         document.addEventListener('msfullscreenchange', checkFullscreen);
         
-        document.getElementById("my-video").addEventListener('ended', function(e) {{
-            if (document.exitFullscreen) {{ document.exitFullscreen(); }}
-            else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
+        document.getElementById("my-video").addEventListener('ended', function(e) {
+            if (document.exitFullscreen) { document.exitFullscreen(); }
+            else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
             
-            setTimeout(function() {{
+            setTimeout(function() {
                 var buttons = window.parent.document.getElementsByTagName("button");
-                for (var i = 0; i < buttons.length; i++) {{
-                    if (buttons[i].innerText.includes("Kliknij tutaj jeśli ankieta")) {{
+                for (var i = 0; i < buttons.length; i++) {
+                    if (buttons[i].innerText.includes("###AUTO_NEXT###")) {
                         buttons[i].click();
                         break;
-                    }}
-                }}
-            }}, 500);
-        }});
+                    }
+                }
+            }, 500);
+        });
     </script>
     """
     
@@ -345,14 +345,61 @@ else:
                             st.rerun()
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
-    else:
-        st.write("Ankieta pojawi się po zakończeniu wideo.")
+   else:
+        st.write("Ankieta pojawi się automatycznie po zakończeniu wideo.")
         
-        if st.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
-            st.session_state.video_ended = True
-            st.rerun()
-            
-        st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
+        # --- UKRYTY MECHANIZM AUTOMATYCZNEGO PRZEJŚCIA ---
+        # Ten przycisk jest klikany przez JavaScript po zakończeniu filmu.
+        # Ukrywamy go CSS-em, żeby użytkownik nie mógł w niego kliknąć i pominąć filmu.
+        
+        # Kod CSS sprawiający, że przycisk jest niewidoczny (opacity: 0) i nie zajmuje miejsca
+        st.markdown("""
+            <style>
+            div.stButton > button:first-child {
+                /* To jest ogólny styl, ale poniższy button ma unikalny tekst, 
+                   więc user go nie znajdzie łatwo, a CSS go ukryje */
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        # Używamy pustego kontenera, aby CSS mógł zadziałać lokalnie (w miarę możliwości)
+        # Hack: przycisk nazywa się "###AUTO_NEXT###", JS go szuka i klika.
+        # User widzi go jako pustą przestrzeń lub wcale (dzięki opacity w CSS poniżej).
+        
+        chk_col1, chk_col2 = st.columns([0.1, 99.9])
+        with chk_col1:
+            # Nadajemy mu klucz, żeby nie mylił się z innymi
+            if st.button("###AUTO_NEXT###", key="auto_trigger_btn"): 
+                st.session_state.video_ended = True
+                st.rerun()
+
+        # Twarde ukrywanie tego konkretnego przycisku
+        st.markdown("""
+            <script>
+                // Dodatkowe zabezpieczenie JS, gdyby CSS zawiódł
+                const buttons = window.parent.document.getElementsByTagName("button");
+                for (const btn of buttons) {
+                    if (btn.innerText.includes("###AUTO_NEXT###")) {
+                        btn.style.opacity = "0";
+                        btn.style.height = "0px";
+                        btn.style.width = "0px";
+                        btn.style.padding = "0px";
+                        btn.style.border = "none";
+                        btn.style.pointerEvents = "none"; // Blokuje kliknięcia myszką przez człowieka
+                    }
+                }
+            </script>
+            <style>
+                /* Ukrywanie kolumny zawierającej przycisk */
+                [data-testid="column"]:has(div.stButton button:contains('###AUTO_NEXT###')) {
+                    display: none;
+                }
+                /* Alternatywne ukrywanie dla starszych przeglądarek - po prostu opacity na ten konkretny guzik */
+                button[kind="secondary"] p {
+                    color: transparent;
+                }
+            </style>
+        """, unsafe_allow_html=True)
 
 # --- SEKCJA RATUNKOWA (PEŁNY RESET WIDEO) ---
     st.write("")
