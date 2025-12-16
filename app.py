@@ -11,7 +11,6 @@ import time
 st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
 # --- KONFIGURACJA GOOGLE SHEETS ---
-# Wklej swój link do arkusza
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=310694828#gid=310694828"
 
 def get_google_sheet_client():
@@ -25,14 +24,11 @@ def save_new_user(age, gender, vision, environment):
     """Tworzy nowego użytkownika, generuje ID i zapisuje w zakładce 'Uczestnicy'."""
     try:
         client = get_google_sheet_client()
-        # Otwieramy zakładkę o nazwie "Uczestnicy"
         sheet = client.open_by_url(SHEET_URL).worksheet("Uczestnicy")
         
-        # Generujemy unikalne ID (krótkie, 8 znaków dla czytelności)
         new_user_id = str(uuid.uuid4())[:8]
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Zapisujemy: ID, Data, Wiek, Płeć, Wzrok, Środowisko
         sheet.append_row([new_user_id, timestamp, age, gender, vision, environment])
         return new_user_id
     except Exception as e:
@@ -43,39 +39,98 @@ def save_rating(user_id, video_code, rating):
     """Zapisuje ocenę wideo w zakładce 'Wyniki'."""
     try:
         client = get_google_sheet_client()
-        # Otwieramy zakładkę o nazwie "Wyniki"
         sheet = client.open_by_url(SHEET_URL).worksheet("Wyniki")
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Zapis: User_ID, Data, Kod Wideo, Ocena
         sheet.append_row([user_id, timestamp, video_code, rating])
         return True
     except Exception as e:
         st.error(f"Błąd zapisu oceny: {e}")
         return False
 
-# --- DANE WIDEO ---
+# --- PEŁNA LISTA WIDEO ---
 BASE_URL = "https://github.com/AntoniUlmaniec/video-qoe-test/releases/download/v1.0/"
+
 VIDEO_MAP = {
     "SEQ_01": "out_bigBuckBunny_1920x1080_3000k.mp4",
     "SEQ_02": "out_bigBuckBunny_1920x1080_3000k_withAD.mp4",
     "SEQ_03": "out_bigBuckBunny_256x144_100k.mp4",
     "SEQ_04": "out_bigBuckBunny_256x144_100k_withAD.mp4",
-    # ... (możesz tu wkleić resztę swoich filmów, skróciłem dla czytelności) ...
+    "SEQ_05": "out_bigBuckBunny_480x270_250k.mp4",
+    "SEQ_06": "out_bigBuckBunny_480x270_250k_withAD.mp4",
+    "SEQ_07": "out_caminandes_1920x1080_3000k.mp4",
+    "SEQ_08": "out_caminandes_1920x1080_3000k_withAD.mp4",
+    "SEQ_09": "out_caminandes_256x144_75k.mp4",
+    "SEQ_10": "out_caminandes_256x144_75k_withAD.mp4",
+    "SEQ_11": "out_caminandes_480x270_250k.mp4",
+    "SEQ_12": "out_caminandes_480x270_250k_withAD.mp4",
+    "SEQ_13": "out_elephantsDream_1920x1080_3000k.mp4",
+    "SEQ_14": "out_elephantsDream_1920x1080_3000k_withAD.mp4",
+    "SEQ_15": "out_elephantsDream_256x144_100k.mp4",
+    "SEQ_16": "out_elephantsDream_256x144_100k_withAD.mp4",
+    "SEQ_17": "out_elephantsDream_480x270_400k.mp4",
+    "SEQ_18": "out_elephantsDream_480x270_400k_withAD.mp4",
+    "SEQ_19": "out_sintelDragons_1920x1080_3000k.mp4",
+    "SEQ_20": "out_sintelDragons_1920x1080_3000k_withAD.mp4",
+    "SEQ_21": "out_sintelDragons_256x144_75k.mp4",
+    "SEQ_22": "out_sintelDragons_256x144_75k_withAD.mp4",
+    "SEQ_23": "out_sintelDragons_480x270_250k.mp4",
     "SEQ_24": "out_sintelDragons_480x270_250k_withAD.mp4"
 }
 
-# --- LOGIKA APLIKACJI ---
+# --- ZARZĄDZANIE STANEM APLIKACJI ---
+# 1. Czy użytkownik przeczytał wstęp?
+if 'intro_accepted' not in st.session_state:
+    st.session_state.intro_accepted = False
 
-# 1. Sprawdzamy, czy użytkownik jest już "zalogowany" (ma ID)
+# 2. Czy użytkownik ma ID (czy wypełnił ankietę demograficzną)?
 if 'user_id' not in st.session_state:
-    # --- EKRAN POWITALNY / ANKIETA DEMOGRAFICZNA ---
-    st.title("Witaj w badaniu QoE")
+    st.session_state.user_id = None
+
+
+# --- LOGIKA WYŚWIETLANIA ---
+
+if not st.session_state.intro_accepted:
+    # === ETAP 1: EKRAN POWITALNY / INSTRUKCJA ===
+    st.title("Witamy w badaniu jakości wideo")
+    st.subheader("Dziękujemy za udział w teście.")
+    
     st.markdown("""
-    Cześć! Dziękuję za udział w eksperymencie.
-    Zanim przejdziemy do oglądania wideo, proszę o kilka podstawowych informacji statystycznych.
-    Są one w pełni **anonimowe**.
+    Podczas eksperymentu na Twoim urządzeniu wyświetlane będą krótkie sekwencje wideo.
+    Po obejrzeniu każdej sekwencji zostaniesz poproszony o ocenę jakości materiału.
+    
+    Prosimy, abyś skupił się na **jakości wideo**, a nie na treści czy ewentualnych reklamach.
+    """)
+    
+    st.info("""
+    **Wytyczne do testu:**
+    * Oglądaj każdą sekwencję uważnie od początku do końca.
+    * Postaraj się wykonać test w cichym otoczeniu.
+    * Oceniaj każdą sekwencję wyłącznie na podstawie własnego odczucia.
+    """)
+    
+    st.markdown("""
+    Po każdej sekwencji zadamy Ci pytanie:  
+    ***"Jaka jest Twoja opinia o jakości wideo?"***
+    
+    Prosimy o intuicyjne odpowiedzi – nie ma złych ani dobrych ocen. Interesuje nas Twoja subiektywna opinia. 
+    Żadna wiedza techniczna ani wcześniejsze doświadczenie nie są wymagane.
+    
+    Dziękujemy za Twój czas i zaangażowanie.
+    """)
+    
+    st.write("") # Odstęp
+    if st.button("ROZPOCZNIJ", type="primary"):
+        st.session_state.intro_accepted = True
+        st.rerun()
+
+elif st.session_state.user_id is None:
+    # === ETAP 2: ANKIETA DEMOGRAFICZNA ===
+    st.title("Metryczka uczestnika")
+    st.markdown("""
+    Zanim przejdziemy do wideo, prosimy o kilka podstawowych informacji statystycznych.
+    Są one w pełni **anonimowe** i służą wyłącznie do celów naukowych.
     """)
     st.markdown("---")
     
@@ -91,24 +146,27 @@ if 'user_id' not in st.session_state:
         srodowisko = st.radio("W jakich warunkach przeprowadzasz test?",
                               ["W domu (spokój)", "W biurze/szkole", "W podróży/na zewnątrz"])
         
-        submitted = st.form_submit_button("ROZPOCZNIJ TEST", type="primary")
+        submitted = st.form_submit_button("PRZEJDŹ DO TESTU WIDEO", type="primary")
         
         if submitted:
             with st.spinner("Generowanie profilu..."):
-                # Zapisujemy usera i dostajemy jego ID
                 uid = save_new_user(wiek, plec, wzrok, srodowisko)
-                
                 if uid:
                     st.session_state.user_id = uid
-                    # Inicjujemy też losowanie pierwszego filmu
+                    # Inicjujemy losowanie pierwszego filmu
                     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
                     st.session_state.rated = False
                     st.rerun()
 
 else:
-    # --- EKRAN WŁAŚCIWY (TEST WIDEO) ---
-    # Ten kod wykonuje się TYLKO, gdy mamy już user_id
+    # === ETAP 3: WŁAŚCIWY TEST WIDEO ===
     
+    # Inicjalizacja zmiennych jeśli zniknęły
+    if 'current_code' not in st.session_state:
+        st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
+    if 'rated' not in st.session_state:
+        st.session_state.rated = False
+
     def losuj_nowe():
         lista_kodow = list(VIDEO_MAP.keys())
         nowy_kod = random.choice(lista_kodow)
@@ -117,19 +175,19 @@ else:
         st.session_state.current_code = nowy_kod
         st.session_state.rated = False
 
-    st.title("Badanie Jakosci Wideo (QoE)")
-    # Wyświetlamy ID dyskretnie na dole lub w sidebarze
-    st.sidebar.text(f"Twój ID uczestnika: {st.session_state.user_id}")
+    st.title("Badanie Jakości Wideo (QoE)")
+    # Dyskretne ID
+    st.caption(f"ID Uczestnika: {st.session_state.user_id}")
     
-    st.info("Twoim zadaniem jest obejrzec wyswietlony klip i ocenic jego jakosc.")
+    st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
 
     code = st.session_state.current_code
-    filename = VIDEO_MAP.get(code, "out_bigBuckBunny_1920x1080_3000k.mp4") # Fallback
+    filename = VIDEO_MAP.get(code, "out_bigBuckBunny_1920x1080_3000k.mp4")
     video_url = BASE_URL + filename
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO ---
+    # --- PLAYER WIDEO (Fake Fullscreen) ---
     video_html = f"""
     <style>
         #start-btn {{
@@ -174,13 +232,12 @@ else:
 
     if not st.session_state.rated:
         with st.form("rating_form"):
-            st.write("Po obejrzeniu filmu, zaznacz ocenę:")
-            ocena = st.slider("Jakość (1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
+            st.write("**Jaka jest Twoja opinia o jakości wideo?**")
+            ocena = st.slider("(1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
             
             submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
             
             if submitted:
-                # TU JEST ZMIANA: Przekazujemy user_id do funkcji zapisu
                 with st.spinner("Zapisuję..."):
                     sukces = save_rating(st.session_state.user_id, code, ocena)
                     if sukces:
@@ -193,6 +250,6 @@ else:
         st.info("Wideo ocenione. Ładowanie kolejnego...")
 
     st.markdown("---")
-    if st.button("Pomiń to wideo"):
+    if st.button("Pomiń to wideo (losuj inne)"):
         losuj_nowe()
         st.rerun()
