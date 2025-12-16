@@ -354,26 +354,27 @@ else:
             
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
 
-
+# --- SEKCJA RATUNKOWA (PEŁNY RESET WIDEO) ---
     st.write("")
     st.write("")
     
     with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
         st.warning("""
-        Użyj tego przycisku, jeśli widzisz komunikat 'Wideo ocenione', ale nic się nie dzieje.
-        Przycisk przywróci formularz oceny dla TEGO SAMEGO wideo.
+        Użyj tego przycisku, jeśli ekran zaciął się po ocenie lub wideo nie działa.
+        
+        ⚠️ UWAGA: Kliknięcie przycisku ZRESETUJE obecne zadanie. 
+        Będziesz musiał(a) **obejrzeć wideo od nowa**, aby ankieta pojawiła się ponownie.
         """)
         
-        if st.button("🔄 ODŚWIEŻ EKRAN OCENY"):
-            # 1. Cofamy status "oceniono", dzięki temu zniknie komunikat o ładowaniu,
-            # a pojawi się z powrotem suwak z oceną.
+        if st.button("🔄 ZRESETUJ WIDEO (Wymaga ponownego obejrzenia)"):
+            # 1. Resetujemy status oceny (żeby zniknął komunikat "Wideo ocenione")
             st.session_state.rated = False
             
-            # 2. Upewniamy się, że flaga zakończenia wideo jest aktywna, 
-            # żeby formularz był widoczny (a nie player).
-            st.session_state.video_ended = True
+            # 2. Resetujemy status zakończenia wideo (TO JEST KLUCZOWE)
+            # Ustawienie False sprawia, że Streamlit ukryje formularz, a pokaże znowu Player HTML.
+            st.session_state.video_ended = False
             
-            # 3. Nie zmieniamy 'current_code' ani 'watched_videos' - użytkownik zostaje na tym samym zadaniu.
+            # 3. Nie zmieniamy kodu wideo - zostajemy na tym samym pliku.
             
-            # 4. Odświeżamy stronę
+            # 4. Przeładowanie strony - user zobaczy znowu przycisk "ODTWÓRZ WIDEO"
             st.rerun()
