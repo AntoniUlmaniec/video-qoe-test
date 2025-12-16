@@ -89,10 +89,52 @@ if 'user_id' not in st.session_state:
 if 'video_ended' not in st.session_state:
     st.session_state.video_ended = False
 
-# --- LOGIKA WYŚWIETLANIA ---
+# ZMIENNE DO ŚLEDZENIA POSTĘPU
+if 'watched_videos' not in st.session_state:
+    st.session_state.watched_videos = []
+if 'finished' not in st.session_state:
+    st.session_state.finished = False
 
-if not st.session_state.intro_accepted:
-    # === ETAP 1: EKRAN POWITALNY / INSTRUKCJA ===
+# --- LOGIKA LOSOWANIA Z WYKLUCZENIEM OBEJRZANYCH ---
+def losuj_nowe():
+    wszystkie = list(VIDEO_MAP.keys())
+    dostepne = [k for k in wszystkie if k not in st.session_state.watched_videos]
+    
+    if not dostepne:
+        st.session_state.finished = True
+        st.session_state.current_code = None
+    else:
+        nowy_kod = random.choice(dostepne)
+        while len(dostepne) > 1 and nowy_kod == st.session_state.current_code:
+            nowy_kod = random.choice(dostepne)
+            
+        st.session_state.current_code = nowy_kod
+        st.session_state.rated = False
+        st.session_state.video_ended = False
+
+if 'current_code' not in st.session_state or st.session_state.current_code is None:
+    if not st.session_state.finished:
+        losuj_nowe()
+
+# --- GŁÓWNA LOGIKA WYŚWIETLANIA ---
+
+if st.session_state.finished:
+    # === ETAP 4: EKRAN KOŃCOWY (DZIĘKUJEMY) ===
+    st.balloons()
+    st.title("Badanie zakończone!")
+    st.success("Udało Ci się ocenić wszystkie sekwencje wideo.")
+    
+    st.markdown("""
+    ### Dziękujemy za Twój czas i udział w eksperymencie.
+    
+    Twoje odpowiedzi zostały pomyślnie zapisane w naszej bazie danych. 
+    Wszystkie zebrane informacje są anonimowe i posłużą do celów naukowych w analizie jakości wideo (QoE).
+    
+    Możesz teraz bezpiecznie zamknąć tę kartę przeglądarki.
+    """)
+    st.stop()
+
+elif not st.session_state.intro_accepted:
     st.title("Witamy w badaniu jakości wideo")
     st.subheader("Dziękujemy za udział w teście.")
     
@@ -126,7 +168,6 @@ if not st.session_state.intro_accepted:
         st.rerun()
 
 elif st.session_state.user_id is None:
-    # === ETAP 2: ANKIETA DEMOGRAFICZNA ===
     st.title("Metryczka uczestnika")
     st.markdown("""
     Zanim przejdziemy do wideo, prosimy o kilka podstawowych informacji.
@@ -164,34 +205,31 @@ elif st.session_state.user_id is None:
                 uid = save_new_user(wiek, plec, doswiadczenie, wzrok, srodowisko, urzadzenie)
                 if uid:
                     st.session_state.user_id = uid
-                    st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
-                    st.session_state.rated = False
-                    st.session_state.video_ended = False
+                    st.session_state.watched_videos = []
+                    losuj_nowe()
                     st.rerun()
 
 else:
     # === ETAP 3: WŁAŚCIWY TEST WIDEO ===
     
-    if 'current_code' not in st.session_state:
-        st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
-    if 'rated' not in st.session_state:
-        st.session_state.rated = False
+    if st.session_state.current_code is None and not st.session_state.finished:
+        losuj_nowe()
+        st.rerun()
 
-    def losuj_nowe():
-        lista_kodow = list(VIDEO_MAP.keys())
-        nowy_kod = random.choice(lista_kodow)
-        while len(lista_kodow) > 1 and nowy_kod == st.session_state.current_code:
-            nowy_kod = random.choice(lista_kodow)
-        st.session_state.current_code = nowy_kod
-        st.session_state.rated = False
-        st.session_state.video_ended = False
+    code = st.session_state.current_code
+    
+    # Licznik postępu (opcjonalny, dla informacji użytkownika)
+    progress_count = len(st.session_state.watched_videos) + 1
+    total_videos = len(VIDEO_MAP)
 
     st.title("Badanie Jakości Wideo (QoE)")
-    st.caption(f"ID Uczestnika: {st.session_state.user_id}")
+    # Pasek postępu tekstowy
+    st.caption(f"ID: {st.session_state.user_id} | Wideo {progress_count} z {total_videos}")
+    st.progress(len(st.session_state.watched_videos) / total_videos)
     
     st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
 
-    code = st.session_state.current_code
+    # Pobieramy URL
     filename = VIDEO_MAP.get(code, "out_bigBuckBunny_1920x1080_3000k.mp4")
     video_url = BASE_URL + filename
 
@@ -259,7 +297,7 @@ else:
         st.header("Twoja ocena")
         if not st.session_state.rated:
             with st.form("rating_form"):
-                st.write("**Jaka jest Twoja opinia o jakości wideo?**")
+                st.write("**Jaka jest Twoja opinia o jakości wideo  (nie uwzgledniając treści i ewentalnych reklam)?**")
                 ocena = st.slider("(1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
                 
                 submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
@@ -270,6 +308,8 @@ else:
                         sukces = save_rating(st.session_state.user_id, nazwa_pliku, ocena)
                         if sukces:
                             st.success("Zapisano!")
+                            # OZNACZAMY FILM JAKO OBEJRZANY
+                            st.session_state.watched_videos.append(code)
                             st.session_state.rated = True
                             time.sleep(1)
                             losuj_nowe()
@@ -279,12 +319,9 @@ else:
     else:
         st.write("Ankieta pojawi się po zakończeniu wideo.")
         
-        # --- PRZENIESIONY PRZYCISK AWARYJNY ---
-        # Znajduje się teraz tutaj, pod napisem.
+        # --- PRZYCISK AWARYJNY ---
         if st.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
             st.session_state.video_ended = True
             st.rerun()
             
-        # Zostawiamy ten styl, chociaż po przeniesieniu przycisku może on nie zadziałać idealnie 
-        # (przycisk może stać się widoczny), co w tym miejscu jest akurat pożądane jako fallback.
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
