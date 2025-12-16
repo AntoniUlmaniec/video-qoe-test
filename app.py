@@ -42,10 +42,10 @@ def losuj_nowe():
         nowy_kod = random.choice(lista_kodow)
     st.session_state.current_code = nowy_kod
 
-st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
+st.set_page_config(page_title="Badanie Jakości Wideo", layout="centered")
 
-st.title("Badanie Jakosci Wideo (QoE)")
-st.info("Twoim zadaniem jest obejrzec wyswietlony klip i ocenic jego jakosc.")
+st.title("Badanie Jakości Wideo (QoE)")
+st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
 
 code = st.session_state.current_code
 filename = VIDEO_MAP[code]
@@ -59,19 +59,15 @@ st.markdown("---")
 final_link = f"{FORM_URL}?usp=pp_url&{ENTRY_ID}={code}"
 
 st.header("Twoja ocena")
-st.write("1. Obejrzyj film powyzej.")
-st.write("2. Kliknij przycisk OCEN, aby otworzyc ankiete.")
-st.write(f"3. W ankiecie kod {code} wypelni sie automatycznie.")
+st.write("1. Obejrzyj film powyżej.")
+st.write("2. Kliknij przycisk OCEŃ, aby otworzyć ankietę.")
+st.write(f"3. W ankiecie kod {code} wypełni się automatycznie.")
 
-st.link_button("KLIKNIJ TUTAJ, ABY OCENIC", final_link, type="primary")
+st.link_button("KLIKNIJ TUTAJ, ABY OCENIĆ", final_link, type="primary")
 
 st.markdown("---")
-st.caption("Po wyslaniu ankiety wroc na te karte i wylosuj kolejny film.")
+st.caption("Po wysłaniu ankiety wróć na tę kartę i wylosuj kolejny film.")
 
 if st.button("Wylosuj kolejne wideo"):
     losuj_nowe()
     st.rerun()
-
-with st.expander("Panel Administratora"):
-    st.write("Klucz deszyfrujacy:")
-    st.code(VIDEO_MAP)
