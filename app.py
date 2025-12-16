@@ -35,38 +35,66 @@ VIDEO_MAP = {
 if 'current_code' not in st.session_state:
     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
 
+if 'video_playing' not in st.session_state:
+    st.session_state.video_playing = False
+
 def losuj_nowe():
     lista_kodow = list(VIDEO_MAP.keys())
     nowy_kod = random.choice(lista_kodow)
     while len(lista_kodow) > 1 and nowy_kod == st.session_state.current_code:
         nowy_kod = random.choice(lista_kodow)
     st.session_state.current_code = nowy_kod
+    st.session_state.video_playing = False
 
-st.set_page_config(page_title="Badanie Jakości Wideo", layout="centered")
+st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
-st.title("Badanie Jakości Wideo (QoE)")
-st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
+st.title("Badanie Jakosci Wideo (QoE)")
+st.info("Twoim zadaniem jest obejrzec wyswietlony klip i ocenic jego jakosc.")
 
 code = st.session_state.current_code
 filename = VIDEO_MAP[code]
 video_url = BASE_URL + filename
 
 st.subheader(f"Sekwencja testowa: {code}")
-st.video(video_url, format="video/mp4")
+
+if not st.session_state.video_playing:
+    if st.button("Odtwórz wideo"):
+        st.session_state.video_playing = True
+        st.rerun()
+else:
+    video_html = f"""
+    <style>
+        video::-webkit-media-controls-timeline {{
+            display: none !important;
+        }}
+    </style>
+    <video width="100%" controls autoplay name="media">
+        <source src="{video_url}" type="video/mp4">
+    </video>
+    <script>
+        const video = document.querySelector('video');
+        if (video) {{
+            video.requestFullscreen().catch(err => {{
+                console.log("Fullscreen blocked by browser");
+            }});
+        }}
+    </script>
+    """
+    st.markdown(video_html, unsafe_allow_html=True)
 
 st.markdown("---")
 
 final_link = f"{FORM_URL}?usp=pp_url&{ENTRY_ID}={code}"
 
 st.header("Twoja ocena")
-st.write("1. Obejrzyj film powyżej.")
-st.write("2. Kliknij przycisk OCEŃ, aby otworzyć ankietę.")
-st.write(f"3. W ankiecie kod {code} wypełni się automatycznie.")
+st.write("1. Obejrzyj film powyzej.")
+st.write("2. Kliknij przycisk OCEN, aby otworzyc ankiete.")
+st.write(f"3. W ankiecie kod {code} wypelni sie automatycznie.")
 
-st.link_button("KLIKNIJ TUTAJ, ABY OCENIĆ", final_link, type="primary")
+st.link_button("KLIKNIJ TUTAJ, ABY OCENIC", final_link, type="primary")
 
 st.markdown("---")
-st.caption("Po wysłaniu ankiety wróć na tę kartę i wylosuj kolejny film.")
+st.caption("Po wyslaniu ankiety wroc na te karte i wylosuj kolejny film.")
 
 if st.button("Wylosuj kolejne wideo"):
     losuj_nowe()
