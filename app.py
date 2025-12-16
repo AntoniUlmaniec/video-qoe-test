@@ -11,6 +11,7 @@ import time
 st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
 # --- KONFIGURACJA GOOGLE SHEETS ---
+# Wklej swój link do arkusza
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=310694828#gid=310694828"
 
 def get_google_sheet_client():
@@ -20,7 +21,7 @@ def get_google_sheet_client():
     client = gspread.authorize(creds)
     return client
 
-def save_new_user(age, gender, vision, environment):
+def save_new_user(age, gender, experience, vision, environment, device):
     """Tworzy nowego użytkownika, generuje ID i zapisuje w zakładce 'Uczestnicy'."""
     try:
         client = get_google_sheet_client()
@@ -29,7 +30,8 @@ def save_new_user(age, gender, vision, environment):
         new_user_id = str(uuid.uuid4())[:8]
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        sheet.append_row([new_user_id, timestamp, age, gender, vision, environment])
+        # Zapisujemy: ID, Data, Wiek, Płeć, Doświadczenie, Wzrok, Otoczenie, Urządzenie
+        sheet.append_row([new_user_id, timestamp, age, gender, experience, vision, environment, device])
         return new_user_id
     except Exception as e:
         st.error(f"Błąd zapisu użytkownika: {e}")
@@ -43,6 +45,7 @@ def save_rating(user_id, video_code, rating):
         
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        # Zapis: User_ID, Data, Kod Wideo, Ocena
         sheet.append_row([user_id, timestamp, video_code, rating])
         return True
     except Exception as e:
@@ -80,11 +83,8 @@ VIDEO_MAP = {
 }
 
 # --- ZARZĄDZANIE STANEM APLIKACJI ---
-# 1. Czy użytkownik przeczytał wstęp?
 if 'intro_accepted' not in st.session_state:
     st.session_state.intro_accepted = False
-
-# 2. Czy użytkownik ma ID (czy wypełnił ankietę demograficzną)?
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
 
@@ -126,34 +126,51 @@ if not st.session_state.intro_accepted:
         st.rerun()
 
 elif st.session_state.user_id is None:
-    # === ETAP 2: ANKIETA DEMOGRAFICZNA ===
+    # === ETAP 2: ANKIETA DEMOGRAFICZNA (ZMODYFIKOWANA) ===
     st.title("Metryczka uczestnika")
     st.markdown("""
-    Zanim przejdziemy do wideo, prosimy o kilka podstawowych informacji statystycznych.
+    Zanim przejdziemy do wideo, prosimy o kilka podstawowych informacji.
     Są one w pełni **anonimowe** i służą wyłącznie do celów naukowych.
     """)
     st.markdown("---")
     
     with st.form("demographics_form"):
-        wiek = st.radio("Twój przedział wiekowy:", 
-                        ["18-24", "25-34", "35-44", "45-54", "55+"])
+        # 1. Wiek
+        wiek = st.selectbox("Jaki jest Twój wiek?", 
+                        ["< 18", "18-24", "25-29", "30-39", "40-49", "50-59", "60-69", "70+"])
         
-        plec = st.radio("Płeć:", ["Kobieta", "Mężczyzna", "Nie chcę podawać"])
+        # 2. Płeć
+        plec = st.radio("Płeć:", 
+                        ["Mężczyzna", "Kobieta", "Inna", "Nie chcę podawać"])
         
-        wzrok = st.radio("Czy posiadasz wadę wzroku?", 
-                         ["Nie, mam dobry wzrok", "Tak, ale noszę okulary/soczewki", "Tak, nie korygowana"])
+        st.markdown("---") # Separator
         
-        srodowisko = st.radio("W jakich warunkach przeprowadzasz test?",
-                              ["W domu (spokój)", "W biurze/szkole", "W podróży/na zewnątrz"])
+        # 3. Doświadczenie
+        doswiadczenie = st.radio("Czy masz doświadczenie w testach percepcji (jakości)?",
+                                 ["Nie", "Tak"])
+
+        # 4. Wzrok
+        wzrok = st.selectbox("Jak oceniasz swój wzrok (ew. w korekcji)?", 
+                         ["Doskonały", "Dobry", "Przeciętny", "Słaby", "Zły", "Trudno powiedzieć"])
+        
+        # 5. Otoczenie
+        srodowisko = st.radio("Która opcja najlepiej opisuje Twoje otoczenie?",
+                              ["Sam(a) w cichym pomieszczeniu", 
+                               "Trochę hałasu i rozpraszaczy", 
+                               "Znaczny hałas i rozpraszacze"])
+        
+        # 6. Urządzenie (Nowe pytanie)
+        urzadzenie = st.radio("Z jakiego typu urządzenia korzystasz?",
+                              ["Telefon", "Tablet", "Laptop", "Komputer stacjonarny"])
         
         submitted = st.form_submit_button("PRZEJDŹ DO TESTU WIDEO", type="primary")
         
         if submitted:
             with st.spinner("Generowanie profilu..."):
-                uid = save_new_user(wiek, plec, wzrok, srodowisko)
+                # Przekazujemy wszystkie nowe zmienne do funkcji zapisu
+                uid = save_new_user(wiek, plec, doswiadczenie, wzrok, srodowisko, urzadzenie)
                 if uid:
                     st.session_state.user_id = uid
-                    # Inicjujemy losowanie pierwszego filmu
                     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
                     st.session_state.rated = False
                     st.rerun()
@@ -161,7 +178,6 @@ elif st.session_state.user_id is None:
 else:
     # === ETAP 3: WŁAŚCIWY TEST WIDEO ===
     
-    # Inicjalizacja zmiennych jeśli zniknęły
     if 'current_code' not in st.session_state:
         st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
     if 'rated' not in st.session_state:
@@ -176,7 +192,6 @@ else:
         st.session_state.rated = False
 
     st.title("Badanie Jakości Wideo (QoE)")
-    # Dyskretne ID
     st.caption(f"ID Uczestnika: {st.session_state.user_id}")
     
     st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
@@ -187,7 +202,7 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO (Fake Fullscreen) ---
+    # --- PLAYER WIDEO (BEZ PRZERWY I TEKSTU FULLSCREEN) ---
     video_html = f"""
     <style>
         #start-btn {{
@@ -202,7 +217,7 @@ else:
     </style>
 
     <div id="video-container">
-        <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO (FULLSCREEN)</button>
+        <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO</button>
         <video id="my-video" controlsList="nodownload noplaybackrate">
             <source src="{video_url}" type="video/mp4">
         </video>
@@ -224,7 +239,7 @@ else:
         }});
     </script>
     """
-    components.html(video_html, height=400)
+    components.html(video_html, height=100)
     st.markdown("---")
 
     # --- OCENA ---
