@@ -11,7 +11,6 @@ import time
 st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
 # --- KONFIGURACJA GOOGLE SHEETS ---
-# Wklej swój link do arkusza
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=310694828#gid=310694828"
 
 def get_google_sheet_client():
@@ -87,7 +86,9 @@ if 'intro_accepted' not in st.session_state:
     st.session_state.intro_accepted = False
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
-
+# Nowa flaga - czy wideo zostało obejrzane do końca?
+if 'video_ended' not in st.session_state:
+    st.session_state.video_ended = False
 
 # --- LOGIKA WYŚWIETLANIA ---
 
@@ -120,13 +121,13 @@ if not st.session_state.intro_accepted:
     Dziękujemy za Twój czas i zaangażowanie.
     """)
     
-    st.write("") # Odstęp
+    st.write("") 
     if st.button("ROZPOCZNIJ", type="primary"):
         st.session_state.intro_accepted = True
         st.rerun()
 
 elif st.session_state.user_id is None:
-    # === ETAP 2: ANKIETA DEMOGRAFICZNA (ZMODYFIKOWANA) ===
+    # === ETAP 2: ANKIETA DEMOGRAFICZNA ===
     st.title("Metryczka uczestnika")
     st.markdown("""
     Zanim przejdziemy do wideo, prosimy o kilka podstawowych informacji.
@@ -135,31 +136,25 @@ elif st.session_state.user_id is None:
     st.markdown("---")
     
     with st.form("demographics_form"):
-        # 1. Wiek
         wiek = st.selectbox("Jaki jest Twój wiek?", 
                         ["< 18", "18-24", "25-29", "30-39", "40-49", "50-59", "60-69", "70+"])
         
-        # 2. Płeć
         plec = st.radio("Płeć:", 
                         ["Mężczyzna", "Kobieta", "Inna", "Nie chcę podawać"])
         
-        st.markdown("---") # Separator
+        st.markdown("---")
         
-        # 3. Doświadczenie
         doswiadczenie = st.radio("Czy masz doświadczenie w testach percepcji (jakości)?",
                                  ["Nie", "Tak"])
 
-        # 4. Wzrok
         wzrok = st.selectbox("Jak oceniasz swój wzrok (ew. w korekcji)?", 
                          ["Doskonały", "Dobry", "Przeciętny", "Słaby", "Zły", "Trudno powiedzieć"])
         
-        # 5. Otoczenie
         srodowisko = st.radio("Która opcja najlepiej opisuje Twoje otoczenie?",
                               ["Sam(a) w cichym pomieszczeniu", 
                                "Trochę hałasu i rozpraszaczy", 
                                "Znaczny hałas i rozpraszacze"])
         
-        # 6. Urządzenie (Nowe pytanie)
         urzadzenie = st.radio("Z jakiego typu urządzenia korzystasz?",
                               ["Telefon", "Tablet", "Laptop", "Komputer stacjonarny"])
         
@@ -167,12 +162,13 @@ elif st.session_state.user_id is None:
         
         if submitted:
             with st.spinner("Generowanie profilu..."):
-                # Przekazujemy wszystkie nowe zmienne do funkcji zapisu
                 uid = save_new_user(wiek, plec, doswiadczenie, wzrok, srodowisko, urzadzenie)
                 if uid:
                     st.session_state.user_id = uid
                     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
                     st.session_state.rated = False
+                    # Resetujemy flagę końca filmu przy starcie
+                    st.session_state.video_ended = False
                     st.rerun()
 
 else:
@@ -190,6 +186,8 @@ else:
             nowy_kod = random.choice(lista_kodow)
         st.session_state.current_code = nowy_kod
         st.session_state.rated = False
+        # RESETUJEMY FLAGĘ ENDED, ABY UKRYĆ FORMULARZ PRZY NOWYM FILMIE
+        st.session_state.video_ended = False
 
     st.title("Badanie Jakości Wideo (QoE)")
     st.caption(f"ID Uczestnika: {st.session_state.user_id}")
@@ -202,7 +200,26 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO (BEZ PRZERWY I TEKSTU FULLSCREEN) ---
+    # --- UKRYTY PRZYCISK "BRIDGE" (most między JS a Pythonem) ---
+    # Ten przycisk jest klikany automatycznie przez JS, gdy film się skończy.
+    # Jeśli automatyzacja zawiedzie, użytkownik może go kliknąć ręcznie.
+    
+    if not st.session_state.video_ended:
+        # Pusty kontener na przycisk (zostanie wypełniony, jeśli JS nie zadziała od razu)
+        placeholder = st.empty()
+        
+        # Przycisk zmienia stan session_state i przeładowuje stronę
+        if placeholder.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
+            st.session_state.video_ended = True
+            st.rerun()
+            
+        # CSS ukrywający ten przycisk (opcjonalne - usuń linię poniżej, jeśli chcesz widzieć przycisk)
+        st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
+    
+    # --- PLAYER WIDEO ---
+    # Renderujemy go tylko, jeśli film jeszcze nie został obejrzany (lub chcemy go zostawić).
+    # Tutaj zostawiamy player, ale formularz pojawi się pod nim.
+    
     video_html = f"""
     <style>
         #start-btn {{
@@ -233,38 +250,65 @@ else:
             if (video.requestFullscreen) {{ video.requestFullscreen(); }}
             else if (video.webkitRequestFullscreen) {{ video.webkitRequestFullscreen(); }}
         }}
+        
         document.getElementById("my-video").addEventListener('ended', function(e) {{
+            // 1. Zamknij fullscreen
             if (document.exitFullscreen) {{ document.exitFullscreen(); }}
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
+            
+            // 2. Szukaj przycisku Streamlit i kliknij go
+            // Musimy wyjść z ramki (iframe) do głównego dokumentu
+            setTimeout(function() {{
+                var buttons = window.parent.document.getElementsByTagName("button");
+                for (var i = 0; i < buttons.length; i++) {{
+                    // Szukamy przycisku po jego tekście
+                    if (buttons[i].innerText.includes("Kliknij tutaj jeśli ankieta")) {{
+                        buttons[i].click();
+                        break;
+                    }}
+                }}
+            }}, 500); // Małe opóźnienie dla pewności
         }});
     </script>
     """
-    components.html(video_html, height=100)
-    st.markdown("---")
-
-    # --- OCENA ---
-    st.header("Twoja ocena")
-
-    if not st.session_state.rated:
-        with st.form("rating_form"):
-            st.write("**Jaka jest Twoja opinia o jakości wideo?**")
-            ocena = st.slider("(1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
-            
-            submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
-            
-            if submitted:
-                with st.spinner("Zapisuję..."):
-                    sukces = save_rating(st.session_state.user_id, code, ocena)
-                    if sukces:
-                        st.success("Zapisano!")
-                        st.session_state.rated = True
-                        time.sleep(1)
-                        losuj_nowe()
-                        st.rerun()
+    
+    # Wyświetlamy wideo tylko jeśli jeszcze nie zakończono oglądania
+    # (Możesz usunąć 'if', jeśli wideo ma zostać widoczne nad ankietą)
+    if not st.session_state.video_ended:
+        components.html(video_html, height=100)
     else:
-        st.info("Wideo ocenione. Ładowanie kolejnego...")
+        st.success("Wideo zakończone. Proszę wypełnić ankietę poniżej.")
 
     st.markdown("---")
+
+    # --- OCENA (POJAWIA SIĘ DOPIERO GDY VIDEO_ENDED = TRUE) ---
+    
+    if st.session_state.video_ended:
+        st.header("Twoja ocena")
+        if not st.session_state.rated:
+            with st.form("rating_form"):
+                st.write("**Jaka jest Twoja opinia o jakości wideo?**")
+                ocena = st.slider("(1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
+                
+                submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
+                
+                if submitted:
+                    with st.spinner("Zapisuję..."):
+                        sukces = save_rating(st.session_state.user_id, code, ocena)
+                        if sukces:
+                            st.success("Zapisano!")
+                            st.session_state.rated = True
+                            time.sleep(1)
+                            losuj_nowe()
+                            st.rerun()
+        else:
+            st.info("Wideo ocenione. Ładowanie kolejnego...")
+    else:
+        # Pusty placeholder, żeby strona nie skakała
+        st.write("Ankieta pojawi się po zakończeniu wideo.")
+
+    st.markdown("---")
+    # Przycisk awaryjny zawsze widoczny na dole, gdyby coś się zacięło
     if st.button("Pomiń to wideo (losuj inne)"):
         losuj_nowe()
         st.rerun()
