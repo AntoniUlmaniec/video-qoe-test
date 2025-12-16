@@ -11,7 +11,7 @@ st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
 # --- KONFIGURACJA GOOGLE SHEETS ---
 # Wklej tutaj PEŁNY LINK do swojego Arkusza Google
-SHEET_URL = "https://docs.google.com/spreadsheets/d/TWOJ_LINK_DO_ARKUSZA/edit" 
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=0#gid=0" 
 
 def save_to_google_sheets(video_code, rating):
     """Funkcja łącząca się z Google Sheets i zapisująca wynik."""
