@@ -4,33 +4,33 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import streamlit.components.v1 as components
+import time
 
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 
 # --- KONFIGURACJA GOOGLE SHEETS ---
-# Upewnij się, że masz plik secrets.toml lub sekrety w chmurze skonfigurowane!
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=0#gid=0" 
+# Wklej tutaj PEŁNY LINK do swojego Arkusza Google
+SHEET_URL = "https://docs.google.com/spreadsheets/d/TWOJ_LINK_DO_ARKUSZA/edit" 
 
 def save_to_google_sheets(video_code, rating):
+    """Funkcja łącząca się z Google Sheets i zapisująca wynik."""
     try:
-        # Pobieramy dane logowania z sekretów Streamlit
-        # Zakładamy, że w secrets.toml sekcja nazywa się [gcp_service_account]
+        # Pobieranie danych logowania z sekretów
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
         client = gspread.authorize(creds)
         
-        # Otwieramy arkusz
-        sheet = client.open_by_url(SHEET_URL).sheet1  # sheet1 to pierwsza zakładka
+        # Otwieranie arkusza po URL (najbezpieczniejsza metoda)
+        sheet = client.open_by_url(SHEET_URL).sheet1
         
-        # Pobieramy aktualną datę
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Zapisujemy wiersz: [Data, Kod Wideo, Ocena]
+        # Zapis: [Data, Kod Wideo, Ocena]
         sheet.append_row([timestamp, video_code, rating])
         return True
     except Exception as e:
-        st.error(f"Błąd zapisu do bazy: {e}")
+        st.error(f"Wystąpił błąd podczas zapisu: {e}")
         return False
 
 # --- DANE WIDEO ---
@@ -63,11 +63,10 @@ VIDEO_MAP = {
     "SEQ_24": "out_sintelDragons_480x270_250k_withAD.mp4"
 }
 
-# --- LOGIKA STANU ---
+# --- LOGIKA STANU (SESSION STATE) ---
 if 'current_code' not in st.session_state:
     st.session_state.current_code = random.choice(list(VIDEO_MAP.keys()))
 
-# Dodatkowa flaga, czy oceniono już bieżący film
 if 'rated' not in st.session_state:
     st.session_state.rated = False
 
@@ -77,11 +76,11 @@ def losuj_nowe():
     while len(lista_kodow) > 1 and nowy_kod == st.session_state.current_code:
         nowy_kod = random.choice(lista_kodow)
     st.session_state.current_code = nowy_kod
-    st.session_state.rated = False # Resetujemy flagę oceny
+    st.session_state.rated = False # Resetujemy flagę, aby pokazać formularz dla nowego filmu
 
-# --- INTERFEJS ---
+# --- UI STRONY ---
 st.title("Badanie Jakosci Wideo (QoE)")
-st.info("Twoim zadaniem jest obejrzec klip i ocenic go BEZ wychodzenia ze strony.")
+st.info("Twoim zadaniem jest obejrzec wyswietlony klip i ocenic jego jakosc.")
 
 code = st.session_state.current_code
 filename = VIDEO_MAP[code]
@@ -89,74 +88,111 @@ video_url = BASE_URL + filename
 
 st.subheader(f"Sekwencja testowa: {code}")
 
-# --- PLAYER WIDEO (Ten sam co wcześniej) ---
+# --- SEKCJA HTML/JS DLA WIDEO (TWOJA ORYGINALNA WERSJA) ---
 video_html = f"""
 <style>
+    /* Stylizacja przycisku startowego */
     #start-btn {{
-        background-color: #FF4B4B; color: white; padding: 15px 32px;
-        text-align: center; display: inline-block; font-size: 16px;
-        margin: 4px 2px; cursor: pointer; border: none; border-radius: 4px;
-        width: 100%; font-weight: bold;
+        background-color: #FF4B4B;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        width: 100%;
+        font-weight: bold;
     }}
-    #start-btn:hover {{ background-color: #FF2B2B; }}
-    #video-overlay {{
-        display: none; position: fixed; top: 0; left: 0;
-        width: 100vw; height: 100vh; background-color: black;
-        z-index: 999999; text-align: center;
+    #start-btn:hover {{
+        background-color: #FF2B2B;
     }}
-    #my-video {{ width: 100%; height: 100%; object-fit: contain; outline: none; }}
-    video::-webkit-media-controls-timeline {{ display: none !important; }}
+    /* Ukrycie paska przewijania w wideo */
+    video::-webkit-media-controls-timeline {{
+        display: none !important;
+    }}
+    /* Ukrycie wideo na początku */
+    #my-video {{
+        display: none;
+        width: 100%;
+    }}
 </style>
 
-<div id="controls-container">
-    <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO</button>
-</div>
-
-<div id="video-overlay">
+<div id="video-container">
+    <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO (FULLSCREEN)</button>
+    
     <video id="my-video" controlsList="nodownload noplaybackrate">
         <source src="{video_url}" type="video/mp4">
+        Twoja przeglądarka nie obsługuje wideo.
     </video>
 </div>
 
 <script>
-    var video = document.getElementById("my-video");
-    var overlay = document.getElementById("video-overlay");
-    function startVideo() {{ overlay.style.display = "block"; video.play(); }}
-    video.addEventListener('ended', function(e) {{ overlay.style.display = "none"; }});
-    document.addEventListener('keydown', function(e) {{
-        if (e.key === "Escape" || e.keyCode === 27) {{ e.preventDefault(); return false; }}
+    function startVideo() {{
+        var video = document.getElementById("my-video");
+        var btn = document.getElementById("start-btn");
+        
+        // 1. Pokaż wideo, ukryj przycisk
+        video.style.display = "block";
+        btn.style.display = "none";
+        
+        // 2. Zacznij odtwarzać
+        video.play();
+        
+        // 3. Wymuś pełny ekran (musi być wywołane przez kliknięcie!)
+        if (video.requestFullscreen) {{
+            video.requestFullscreen();
+        }} else if (video.webkitRequestFullscreen) {{ /* Safari */
+            video.webkitRequestFullscreen();
+        }} else if (video.msRequestFullscreen) {{ /* IE11 */
+            video.msRequestFullscreen();
+        }}
+    }}
+    
+    // Opcjonalnie: Wyłącz pełny ekran gdy film się skończy
+    document.getElementById("my-video").addEventListener('ended', function(e) {{
+        if (document.exitFullscreen) {{
+            document.exitFullscreen();
+        }} else if (document.webkitExitFullscreen) {{
+            document.webkitExitFullscreen();
+        }}
     }});
 </script>
 """
-components.html(video_html, height=100)
 
+# Renderowanie HTML
+st.components.v1.html(video_html, height=400)
 st.markdown("---")
 
-# --- NOWY FORMULARZ OCENY ---
+# --- SEKCJA OCENY (ZINTEGROWANA Z GOOGLE SHEETS) ---
 st.header("Twoja ocena")
 
 if not st.session_state.rated:
-    # Formularz
-    with st.form("qoe_form"):
-        st.write("Jak oceniasz jakość obejrzanego wideo?")
+    with st.form("rating_form"):
+        st.write("Po obejrzeniu filmu, zaznacz ocenę na suwaku poniżej:")
         
-        # Suwak 1-5 (możesz zmienić na st.feedback("stars") w nowszym Streamlit)
-        ocena = st.slider("Jakość (1 - Bardzo zła, 5 - Doskonała)", 1, 5, 3)
+        # Suwak od 1 do 5
+        ocena = st.slider("Jakość wideo (1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
         
-        # Przycisk wysyłania (wewnątrz formularza)
-        submitted = st.form_submit_button("ZAPISZ OCENĘ", type="primary")
+        submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
         
         if submitted:
-            with st.spinner("Zapisuję wynik..."):
+            with st.spinner("Zapisuję wynik w bazie..."):
                 sukces = save_to_google_sheets(code, ocena)
                 if sukces:
+                    st.success("Zapisano pomyślnie!")
                     st.session_state.rated = True
-                    st.success("Ocena zapisana! Ładuję kolejne wideo...")
-                    import time
-                    time.sleep(1.5) # Krótka pauza żeby użytkownik zobaczył sukces
+                    time.sleep(1) # Krótka pauza dla efektu
                     losuj_nowe()
                     st.rerun()
 else:
-    st.success("Wideo ocenione. Ładowanie nowego...")
+    st.info("Wideo ocenione. Ładowanie kolejnego...")
 
 st.markdown("---")
+# Opcjonalny przycisk awaryjny do pominięcia
+if st.button("Pomiń to wideo (losuj inne)"):
+    losuj_nowe()
+    st.rerun()
