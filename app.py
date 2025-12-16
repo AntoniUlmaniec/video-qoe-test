@@ -244,9 +244,6 @@ else:
     st.subheader(f"Sekwencja testowa: {code}")
 
     # --- UKRYWANIE SIDEBARA (To likwiduje mignięcie) ---
-    # Ukrywamy cały pasek boczny i przycisk jego rozwijania.
-    # Dzięki temu przycisk, który tam wrzucimy, będzie w 100% niewidoczny dla oka,
-    # ale dostępny dla naszego skryptu.
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -255,7 +252,6 @@ else:
     """, unsafe_allow_html=True)
 
     # --- PLAYER WIDEO I JS ---
-    
     video_html = f"""
     <style>
         #start-btn {{
@@ -313,10 +309,7 @@ else:
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
             setTimeout(function() {{
-                // METODA SIDEBAR:
-                // Szukamy przycisku, który jest ukryty w panelu bocznym.
-                // Ponieważ panel boczny jest ukryty CSS-em globalnie, przycisk nie mignie.
-                
+                // Szukamy przycisku w ukrytym sidebarze
                 var sidebars = window.parent.document.querySelectorAll('[data-testid="stSidebar"]');
                 if (sidebars.length > 0) {{
                     var buttons = sidebars[0].getElementsByTagName("button");
@@ -336,19 +329,16 @@ else:
         components.html(video_html, height=100)
         
         # --- NIEWIDZIALNY PRZYCISK W SIDEBARZE ---
-        # Umieszczamy przycisk w sidebarze, który wyłączyliśmy CSS-em powyżej.
         with st.sidebar:
             if st.button("NEXT_STEP_TRIGGER"):
                 st.session_state.video_ended = True
                 st.rerun()
-
     else:
         st.success("Wideo zakończone. Proszę wypełnić ankietę poniżej.")
 
     st.markdown("---")
 
     # --- OCENA ---
-    
     if st.session_state.video_ended:
         st.header("Twoja ocena")
         if not st.session_state.rated:
@@ -372,13 +362,13 @@ else:
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
     else:
-        st.write("Ankieta pojawi się po zakończeniu wideo.")
+        st.write("Ankieta pojawi się automatycznie po zakończeniu wideo.")
 
     # --- SEKCJA RATUNKOWA ---
     st.write("")
     st.write("")
-    with st.expander("⚠️ Masz problem techniczny?"):
-        st.warning("Użyj tego przycisku tylko, jeśli wideo się zacięło.")
+    with st.expander("⚠️ Wideo się zacięło lub ankieta nie działa?"):
+        st.warning("Kliknij poniżej, aby przeładować wideo i spróbować ponownie.")
         if st.button("🔄 ZRESETUJ WIDEO"):
             st.session_state.rated = False
             st.session_state.video_ended = False
