@@ -179,6 +179,8 @@ elif st.session_state.user_id is None:
     with st.form("demographics_form"):
         wiek = st.selectbox("Jaki jest Twój wiek?", 
                         ["< 18", "18-24", "25-29", "30-39", "40-49", "50-59", "60-69", "70+"])
+
+        st.markdown("---")
         
         plec = st.radio("Płeć:", 
                         ["Mężczyzna", "Kobieta", "Inna", "Nie chcę podawać"])
@@ -188,13 +190,19 @@ elif st.session_state.user_id is None:
         doswiadczenie = st.radio("Czy masz doświadczenie w testach percepcji (jakości)?",
                                  ["Nie", "Tak"])
 
+        st.markdown("---")
+
         wzrok = st.selectbox("Jak oceniasz swój wzrok (ew. w korekcji)?", 
                          ["Doskonały", "Dobry", "Przeciętny", "Słaby", "Zły", "Trudno powiedzieć"])
+
+        st.markdown("---")
         
         srodowisko = st.radio("Która opcja najlepiej opisuje Twoje otoczenie?",
                               ["Sam(a) w cichym pomieszczeniu", 
                                "Trochę hałasu i rozpraszaczy", 
                                "Znaczny hałas i rozpraszacze"])
+
+        st.markdown("---")
         
         urzadzenie = st.radio("Z jakiego typu urządzenia korzystasz?",
                               ["Telefon", "Tablet", "Laptop", "Komputer stacjonarny"])
