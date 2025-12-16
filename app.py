@@ -89,30 +89,42 @@ if 'user_id' not in st.session_state:
 if 'video_ended' not in st.session_state:
     st.session_state.video_ended = False
 
-# ZMIENNE DO ŚLEDZENIA POSTĘPU
+# NOWE ZMIENNE DO ŚLEDZENIA POSTĘPU
 if 'watched_videos' not in st.session_state:
-    st.session_state.watched_videos = []
+    st.session_state.watched_videos = [] # Lista kodów już ocenionych filmów
 if 'finished' not in st.session_state:
     st.session_state.finished = False
 
 # --- LOGIKA LOSOWANIA Z WYKLUCZENIEM OBEJRZANYCH ---
 def losuj_nowe():
+    # Pobieramy wszystkie klucze
     wszystkie = list(VIDEO_MAP.keys())
+    # Odejmujemy te, które są już w liście watched_videos
     dostepne = [k for k in wszystkie if k not in st.session_state.watched_videos]
     
     if not dostepne:
+        # Jeśli lista jest pusta, znaczy że koniec badania
         st.session_state.finished = True
         st.session_state.current_code = None
     else:
+        # Losujemy z dostępnych
         nowy_kod = random.choice(dostepne)
-        while len(dostepne) > 1 and nowy_kod == st.session_state.current_code:
+        
+        # --- POPRAWKA BŁĘDU ---
+        # Używamy .get(), aby uniknąć błędu AttributeError przy pierwszym uruchomieniu
+        obecny_kod = st.session_state.get("current_code")
+        
+        # Zabezpieczenie, żeby nie wylosować tego samego co przed chwilą (chyba że został tylko jeden)
+        while len(dostepne) > 1 and nowy_kod == obecny_kod:
             nowy_kod = random.choice(dostepne)
             
         st.session_state.current_code = nowy_kod
         st.session_state.rated = False
         st.session_state.video_ended = False
 
-if 'current_code' not in st.session_state or st.session_state.current_code is None:
+# Inicjalizacja pierwszego kodu, jeśli go nie ma
+# Używamy bezpiecznego sprawdzenia
+if st.session_state.get('current_code') is None:
     if not st.session_state.finished:
         losuj_nowe()
 
@@ -120,7 +132,7 @@ if 'current_code' not in st.session_state or st.session_state.current_code is No
 
 if st.session_state.finished:
     # === ETAP 4: EKRAN KOŃCOWY (DZIĘKUJEMY) ===
-    st.balloons()
+    st.balloons() # Efekt baloników
     st.title("Badanie zakończone!")
     st.success("Udało Ci się ocenić wszystkie sekwencje wideo.")
     
@@ -132,9 +144,10 @@ if st.session_state.finished:
     
     Możesz teraz bezpiecznie zamknąć tę kartę przeglądarki.
     """)
-    st.stop()
+    st.stop() # Zatrzymuje dalsze wykonywanie skryptu
 
 elif not st.session_state.intro_accepted:
+    # === ETAP 1: EKRAN POWITALNY / INSTRUKCJA ===
     st.title("Witamy w badaniu jakości wideo")
     st.subheader("Dziękujemy za udział w teście.")
     
@@ -168,6 +181,7 @@ elif not st.session_state.intro_accepted:
         st.rerun()
 
 elif st.session_state.user_id is None:
+    # === ETAP 2: ANKIETA DEMOGRAFICZNA ===
     st.title("Metryczka uczestnika")
     st.markdown("""
     Zanim przejdziemy do wideo, prosimy o kilka podstawowych informacji.
@@ -205,6 +219,7 @@ elif st.session_state.user_id is None:
                 uid = save_new_user(wiek, plec, doswiadczenie, wzrok, srodowisko, urzadzenie)
                 if uid:
                     st.session_state.user_id = uid
+                    # Resetujemy stan i losujemy pierwszy
                     st.session_state.watched_videos = []
                     losuj_nowe()
                     st.rerun()
@@ -212,6 +227,7 @@ elif st.session_state.user_id is None:
 else:
     # === ETAP 3: WŁAŚCIWY TEST WIDEO ===
     
+    # Upewniamy się, że mamy kod wideo (chyba że finished)
     if st.session_state.current_code is None and not st.session_state.finished:
         losuj_nowe()
         st.rerun()
@@ -297,7 +313,7 @@ else:
         st.header("Twoja ocena")
         if not st.session_state.rated:
             with st.form("rating_form"):
-                st.write("**Jaka jest Twoja opinia o jakości wideo  (nie uwzgledniając treści i ewentalnych reklam)?**")
+                st.write("**Jaka jest Twoja opinia o jakości wideo?**")
                 ocena = st.slider("(1 - Fatalna, 5 - Doskonała)", 1, 5, 3)
                 
                 submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
@@ -325,3 +341,9 @@ else:
             st.rerun()
             
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    # Przycisk "Pomiń" tylko losuje inny, NIE dodaje do obejrzanych (wraca do puli)
+    if st.button("Pomiń to wideo (losuj inne)"):
+        losuj_nowe()
+        st.rerun()
