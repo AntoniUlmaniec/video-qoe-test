@@ -243,8 +243,9 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO ---
-    # Tutaj jest logika JavaScript, która po zakończeniu filmu szuka ukrytego przycisku i go klika
+    # --- PLAYER WIDEO I UKRYTA LOGIKA ---
+    
+    # 1. Kod HTML/JS playera
     video_html = f"""
     <style>
         #start-btn {{
@@ -302,12 +303,12 @@ else:
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
             setTimeout(function() {{
-                // Szukamy przycisków w głównym oknie Streamlit
+                // Szukamy naszego przycisku-ducha
                 var buttons = window.parent.document.getElementsByTagName("button");
                 for (var i = 0; i < buttons.length; i++) {{
-                    // Szukamy przycisku po jego wewnętrznym tekście (nawet jak jest ukryty CSS-em)
-                    if (buttons[i].innerText.includes("VIDEO_ENDED_CALLBACK")) {{
-                        buttons[i].click(); // Symulujemy kliknięcie
+                    // Szukamy przycisku po unikalnym tekście
+                    if (buttons[i].innerText.includes("GHOST_TRIGGER_BTN")) {{
+                        buttons[i].click();
                         break;
                     }}
                 }}
@@ -315,9 +316,40 @@ else:
         }});
     </script>
     """
-    
+
     if not st.session_state.video_ended:
         components.html(video_html, height=100)
+        
+        # 2. PRZYCISK-DUCH (To jest kluczowa zmiana)
+        # Tworzymy przycisk, ale wstrzykujemy skrypt JS, który natychmiast zmienia jego styl na niewidoczny (0x0px).
+        # Używamy position: absolute, żeby nie zajmował miejsca na ekranie.
+        
+        components.html("""
+        <script>
+            // Ten skrypt działa w tle i pilnuje, żeby przycisk był niewidoczny
+            setInterval(function() {
+                var buttons = window.parent.document.getElementsByTagName('button');
+                for (var i = 0; i < buttons.length; i++) {
+                    if (buttons[i].innerText.includes("GHOST_TRIGGER_BTN")) {
+                        // Zamieniamy go w ducha:
+                        buttons[i].style.opacity = "0";          // Przezroczysty
+                        buttons[i].style.width = "0px";          // Szerokość 0
+                        buttons[i].style.height = "0px";         // Wysokość 0
+                        buttons[i].style.padding = "0px";        // Brak marginesów
+                        buttons[i].style.minHeight = "0px";      // Nadpisanie stylu Streamlit
+                        buttons[i].style.position = "absolute";  // Wyjęcie z układu strony (nie zajmuje miejsca)
+                        buttons[i].style.zIndex = "-1";          // Schowanie pod spód
+                    }
+                }
+            }, 50);
+        </script>
+        """, height=0)
+        
+        # Sam przycisk (musi istnieć w Pythonie, żeby odebrać sygnał)
+        if st.button("GHOST_TRIGGER_BTN"):
+            st.session_state.video_ended = True
+            st.rerun()
+
     else:
         st.success("Wideo zakończone. Proszę wypełnić ankietę poniżej.")
 
@@ -340,7 +372,6 @@ else:
                         sukces = save_rating(st.session_state.user_id, nazwa_pliku, ocena)
                         if sukces:
                             st.success("Zapisano!")
-                            # OZNACZAMY FILM JAKO OBEJRZANY
                             st.session_state.watched_videos.append(code)
                             st.session_state.rated = True
                             time.sleep(1)
@@ -350,55 +381,13 @@ else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
     else:
         st.write("Ankieta pojawi się po zakończeniu wideo.")
-        
-        # --- UKRYTY PRZYCISK TECHNICZNY ---
-        # Ten przycisk jest fizycznie obecny w kodzie strony, ale ukrywamy go skryptem.
-        
-        if st.button("VIDEO_ENDED_CALLBACK", key="hidden_trigger_btn"):
-            st.session_state.video_ended = True
-            st.rerun()
 
-        # SKRYPT UKRYWAJĄCY PRZYCISK
-        # Działa w pętli co 50ms, szukając przycisku z napisem "VIDEO_ENDED_CALLBACK"
-        # i ustawiając mu styl display: none. Dzięki temu znika natychmiast.
-        components.html("""
-        <script>
-            setInterval(function() {
-                // Pobierz wszystkie przyciski w ramce rodzica (czyli w aplikacji Streamlit)
-                var buttons = window.parent.document.getElementsByTagName('button');
-                
-                for (var i = 0; i < buttons.length; i++) {
-                    // Jeśli tekst przycisku to nasz kluczowy tekst
-                    if (buttons[i].innerText.trim() === "VIDEO_ENDED_CALLBACK") {
-                        
-                        // Ukryj sam przycisk
-                        buttons[i].style.display = "none";
-                        buttons[i].style.visibility = "hidden";
-                        
-                        // Opcjonalnie: Ukryj kontener rodzica (div.stButton), żeby nie robił pustego miejsca
-                        var parentDiv = buttons[i].closest('.stButton');
-                        if (parentDiv) {
-                            parentDiv.style.display = "none";
-                        }
-                    }
-                }
-            }, 50); // Sprawdzaj co 50 milisekund
-        </script>
-        """, height=0, width=0)
-
-    # --- SEKCJA RATUNKOWA (PEŁNY RESET WIDEO) ---
+    # --- SEKCJA RATUNKOWA ---
     st.write("")
     st.write("")
-    
-    with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
-        st.warning("""
-        Użyj tego przycisku, jeśli ekran zaciął się po ocenie lub wideo nie działa.
-        
-        ⚠️ UWAGA: Kliknięcie przycisku ZRESETUJE obecne zadanie. 
-        Będziesz musiał(a) **obejrzeć wideo od nowa**, aby ankieta pojawiła się ponownie.
-        """)
-        
-        if st.button("🔄 ZRESETUJ WIDEO (Wymaga ponownego obejrzenia)"):
+    with st.expander("⚠️ Masz problem techniczny?"):
+        st.warning("Użyj tego przycisku tylko, jeśli wideo się zacięło.")
+        if st.button("🔄 ZRESETUJ WIDEO"):
             st.session_state.rated = False
             st.session_state.video_ended = False
             st.rerun()
