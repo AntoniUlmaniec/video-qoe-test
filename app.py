@@ -274,6 +274,27 @@ else:
             if (video.requestFullscreen) {{ video.requestFullscreen(); }}
             else if (video.webkitRequestFullscreen) {{ video.webkitRequestFullscreen(); }}
         }}
+
+        function checkFullscreen() {{
+            var video = document.getElementById("my-video");
+            var btn = document.getElementById("start-btn");
+            
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+                !document.mozFullScreenElement && !document.msFullscreenElement) {{
+                
+                if (!video.ended) {{
+                    video.pause();
+                    video.style.display = "none";
+                    btn.style.display = "inline-block";
+                    btn.innerHTML = "KONTYNUUJ ODTWARZANIE";
+                }}
+            }}
+        }}
+
+        document.addEventListener('fullscreenchange', checkFullscreen);
+        document.addEventListener('webkitfullscreenchange', checkFullscreen);
+        document.addEventListener('mozfullscreenchange', checkFullscreen);
+        document.addEventListener('msfullscreenchange', checkFullscreen);
         
         document.getElementById("my-video").addEventListener('ended', function(e) {{
             if (document.exitFullscreen) {{ document.exitFullscreen(); }}
