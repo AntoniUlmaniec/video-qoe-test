@@ -243,9 +243,19 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO I UKRYTA LOGIKA ---
+    # --- UKRYWANIE SIDEBARA (To likwiduje mignięcie) ---
+    # Ukrywamy cały pasek boczny i przycisk jego rozwijania.
+    # Dzięki temu przycisk, który tam wrzucimy, będzie w 100% niewidoczny dla oka,
+    # ale dostępny dla naszego skryptu.
+    st.markdown("""
+    <style>
+        [data-testid="stSidebar"] { display: none !important; }
+        [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # --- PLAYER WIDEO I JS ---
     
-    # 1. Kod HTML/JS playera
     video_html = f"""
     <style>
         #start-btn {{
@@ -303,13 +313,18 @@ else:
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
             setTimeout(function() {{
-                // Szukamy naszego przycisku-ducha
-                var buttons = window.parent.document.getElementsByTagName("button");
-                for (var i = 0; i < buttons.length; i++) {{
-                    // Szukamy przycisku po unikalnym tekście
-                    if (buttons[i].innerText.includes("GHOST_TRIGGER_BTN")) {{
-                        buttons[i].click();
-                        break;
+                // METODA SIDEBAR:
+                // Szukamy przycisku, który jest ukryty w panelu bocznym.
+                // Ponieważ panel boczny jest ukryty CSS-em globalnie, przycisk nie mignie.
+                
+                var sidebars = window.parent.document.querySelectorAll('[data-testid="stSidebar"]');
+                if (sidebars.length > 0) {{
+                    var buttons = sidebars[0].getElementsByTagName("button");
+                    for (var i = 0; i < buttons.length; i++) {{
+                        if (buttons[i].innerText.includes("NEXT_STEP_TRIGGER")) {{
+                            buttons[i].click();
+                            break;
+                        }}
                     }}
                 }}
             }}, 500);
@@ -320,35 +335,12 @@ else:
     if not st.session_state.video_ended:
         components.html(video_html, height=100)
         
-        # 2. PRZYCISK-DUCH (To jest kluczowa zmiana)
-        # Tworzymy przycisk, ale wstrzykujemy skrypt JS, który natychmiast zmienia jego styl na niewidoczny (0x0px).
-        # Używamy position: absolute, żeby nie zajmował miejsca na ekranie.
-        
-        components.html("""
-        <script>
-            // Ten skrypt działa w tle i pilnuje, żeby przycisk był niewidoczny
-            setInterval(function() {
-                var buttons = window.parent.document.getElementsByTagName('button');
-                for (var i = 0; i < buttons.length; i++) {
-                    if (buttons[i].innerText.includes("GHOST_TRIGGER_BTN")) {
-                        // Zamieniamy go w ducha:
-                        buttons[i].style.opacity = "0";          // Przezroczysty
-                        buttons[i].style.width = "0px";          // Szerokość 0
-                        buttons[i].style.height = "0px";         // Wysokość 0
-                        buttons[i].style.padding = "0px";        // Brak marginesów
-                        buttons[i].style.minHeight = "0px";      // Nadpisanie stylu Streamlit
-                        buttons[i].style.position = "absolute";  // Wyjęcie z układu strony (nie zajmuje miejsca)
-                        buttons[i].style.zIndex = "-1";          // Schowanie pod spód
-                    }
-                }
-            }, 50);
-        </script>
-        """, height=0)
-        
-        # Sam przycisk (musi istnieć w Pythonie, żeby odebrać sygnał)
-        if st.button("GHOST_TRIGGER_BTN"):
-            st.session_state.video_ended = True
-            st.rerun()
+        # --- NIEWIDZIALNY PRZYCISK W SIDEBARZE ---
+        # Umieszczamy przycisk w sidebarze, który wyłączyliśmy CSS-em powyżej.
+        with st.sidebar:
+            if st.button("NEXT_STEP_TRIGGER"):
+                st.session_state.video_ended = True
+                st.rerun()
 
     else:
         st.success("Wideo zakończone. Proszę wypełnić ankietę poniżej.")
