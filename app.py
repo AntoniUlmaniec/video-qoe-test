@@ -355,24 +355,25 @@ else:
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
 
 
-# --- SEKCJA RATUNKOWA (FIX NA ZACIĘCIA) ---
+st.write("")
     st.write("")
-    st.write("")
-    # Używamy expandera, żeby nie rozpraszał użytkownika, jeśli wszystko działa dobrze
+    
     with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
-        st.warning("Użyj tego przycisku TYLKO jeśli ekran zaciął się na komunikacie 'Ładowanie kolejnego...' lub wideo nie chce się załadować.")
+        st.warning("""
+        Użyj tego przycisku, jeśli widzisz komunikat 'Wideo ocenione', ale nic się nie dzieje.
+        Przycisk przywróci formularz oceny dla TEGO SAMEGO wideo.
+        """)
         
-        if st.button("🆘 WYMUŚ NASTĘPNE WIDEO"):
-            # 1. Zabezpieczenie: uznajemy obecne wideo za "zaliczone", żeby nie wróciło
-            if st.session_state.current_code and st.session_state.current_code not in st.session_state.watched_videos:
-                st.session_state.watched_videos.append(st.session_state.current_code)
+        if st.button("🔄 ODŚWIEŻ EKRAN OCENY"):
+            # 1. Cofamy status "oceniono", dzięki temu zniknie komunikat o ładowaniu,
+            # a pojawi się z powrotem suwak z oceną.
+            st.session_state.rated = False
             
-            # 2. Resetujemy kluczowe flagi stanu
-            st.session_state.rated = False       # Reset flagi oceny
-            st.session_state.video_ended = False # Reset flagi końca wideo
+            # 2. Upewniamy się, że flaga zakończenia wideo jest aktywna, 
+            # żeby formularz był widoczny (a nie player).
+            st.session_state.video_ended = True
             
-            # 3. Wymuszamy losowanie nowego wideo
-            losuj_nowe()
+            # 3. Nie zmieniamy 'current_code' ani 'watched_videos' - użytkownik zostaje na tym samym zadaniu.
             
-            # 4. Twarde odświeżenie strony
+            # 4. Odświeżamy stronę
             st.rerun()
