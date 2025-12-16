@@ -301,9 +301,11 @@ else:
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
             setTimeout(function() {{
+                // Szukamy przycisków w Streamlit
                 var buttons = window.parent.document.getElementsByTagName("button");
                 for (var i = 0; i < buttons.length; i++) {{
-                    if (buttons[i].innerText.includes("Kliknij tutaj jeśli ankieta")) {{
+                    // Zmiana: szukamy specjalnego tekstu VIDEO_ENDED_CALLBACK
+                    if (buttons[i].innerText.includes("VIDEO_ENDED_CALLBACK")) {{
                         buttons[i].click();
                         break;
                     }}
@@ -348,12 +350,63 @@ else:
     else:
         st.write("Ankieta pojawi się po zakończeniu wideo.")
         
-        # Ukryty przycisk, który jest "klikany" przez JavaScript po zakończeniu filmu
-        if st.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
+        # --- UKRYTY PRZYCISK TECHNICZNY ---
+        # Ten przycisk jest klikany przez JavaScript.
+        # Jest ukryty przez CSS, aby użytkownik nie mógł go kliknąć ręcznie i pominąć wideo.
+        
+        # Unikalny CSS dla tego elementu - ukrywamy przycisk, który zawiera ten tekst
+        # Metoda: Renderujemy przycisk, a obok style, które "chowają" ten konkretny przycisk
+        # Z uwagi na ograniczenia CSS w Streamlit, stosujemy trick z przezroczystością i pozycjonowaniem.
+        
+        # 1. Kontener z CSS ukrywającym treść
+        st.markdown("""
+        <style>
+        /* Ukryj przycisk zawierający tekst 'VIDEO_ENDED_CALLBACK' */
+        /* Uwaga: To działa w przypadku, gdy Streamlit renderuje button jako kontener */
+        /* Najbardziej niezawodna metoda bez ID: ukrycie przycisku w tej konkretnej sekcji kodu */
+        </style>
+        """, unsafe_allow_html=True)
+
+        # 2. Sam przycisk z unikalnym kluczem
+        if st.button("VIDEO_ENDED_CALLBACK", key="hidden_video_trigger"):
             st.session_state.video_ended = True
             st.rerun()
             
-        st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
+        # 3. CSS "Hard-hide" - to sprawi, że powyższy przycisk będzie niewidoczny i nieklikalny myszką,
+        # ale nadal obecny w DOM dla JavaScriptu.
+        # Selektor 'iframe + ...' może być zawodny, więc używamy ogólnego selektora dla przycisków w tej fazie,
+        # filtrując np. po tekście wewnątrz (jeśli przeglądarka obsługuje :has) lub po prostu
+        # ukrywając go, wiedząc, że to jedyny przycisk w tym bloku "else".
+        
+        st.markdown("""
+        <script>
+            // Dodatkowe zabezpieczenie JS - ukrycie przycisku po załadowaniu
+            const interval = setInterval(() => {
+                const btns = window.parent.document.getElementsByTagName("button");
+                for (let btn of btns) {
+                    if (btn.innerText.includes("VIDEO_ENDED_CALLBACK")) {
+                        btn.style.display = "none"; // Całkowite ukrycie
+                        // LUB jeśli display:none blokuje kliknięcie w Twojej przeglądarce (rzadko):
+                        // btn.style.opacity = "0";
+                        // btn.style.pointerEvents = "none";
+                        // btn.style.position = "absolute";
+                    }
+                }
+            }, 100);
+            setTimeout(() => clearInterval(interval), 5000);
+        </script>
+        <style>
+            /* Fallback CSS: Button z tekstem VIDEO_ENDED_CALLBACK (metoda przybliżona) */
+            div.stButton > button {
+                /* Nie możemy ukryć wszystkich przycisków, bo zniknie 'ZRESETUJ WIDEO' na dole */
+            }
+            /* Ukrycie konkretnie tego przycisku poprzez trick: */
+            /* Przycisk ma tekst "VIDEO_ENDED_CALLBACK". Ustawiamy go na 0 opacity */
+            p:contains('VIDEO_ENDED_CALLBACK') {
+                display: none; 
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
 # --- SEKCJA RATUNKOWA (PEŁNY RESET WIDEO) ---
     st.write("")
@@ -372,7 +425,6 @@ else:
             st.session_state.rated = False
             
             # 2. Resetujemy status zakończenia wideo (TO JEST KLUCZOWE)
-            # Ustawienie False sprawia, że Streamlit ukryje formularz, a pokaże znowu Player HTML.
             st.session_state.video_ended = False
             
             # 3. Nie zmieniamy kodu wideo - zostajemy na tym samym pliku.
