@@ -14,14 +14,12 @@ st.set_page_config(page_title="Badanie Jakosci Wideo", layout="centered")
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1hDmQqQdy7jitS5B8Ah_k6mV31HA9QGRYpm63ISODrbg/edit?hl=pl&gid=310694828#gid=310694828"
 
 def get_google_sheet_client():
-    """Pomocnicza funkcja do autoryzacji."""
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
     client = gspread.authorize(creds)
     return client
 
 def save_new_user(age, gender, experience, vision, environment, device):
-    """Tworzy nowego użytkownika, generuje ID i zapisuje w zakładce 'Uczestnicy'."""
     try:
         client = get_google_sheet_client()
         sheet = client.open_by_url(SHEET_URL).worksheet("Uczestnicy")
@@ -37,7 +35,6 @@ def save_new_user(age, gender, experience, vision, environment, device):
         return None
 
 def save_rating(user_id, video_filename, rating):
-    """Zapisuje ocenę wideo w zakładce 'Wyniki'."""
     try:
         client = get_google_sheet_client()
         sheet = client.open_by_url(SHEET_URL).worksheet("Wyniki")
@@ -91,30 +88,22 @@ if 'video_ended' not in st.session_state:
 
 # NOWE ZMIENNE DO ŚLEDZENIA POSTĘPU
 if 'watched_videos' not in st.session_state:
-    st.session_state.watched_videos = [] # Lista kodów już ocenionych filmów
+    st.session_state.watched_videos = []
 if 'finished' not in st.session_state:
     st.session_state.finished = False
 
 # --- LOGIKA LOSOWANIA Z WYKLUCZENIEM OBEJRZANYCH ---
 def losuj_nowe():
-    # Pobieramy wszystkie klucze
     wszystkie = list(VIDEO_MAP.keys())
-    # Odejmujemy te, które są już w liście watched_videos
     dostepne = [k for k in wszystkie if k not in st.session_state.watched_videos]
     
     if not dostepne:
-        # Jeśli lista jest pusta, znaczy że koniec badania
         st.session_state.finished = True
         st.session_state.current_code = None
     else:
-        # Losujemy z dostępnych
         nowy_kod = random.choice(dostepne)
-        
-        # --- POPRAWKA BŁĘDU ---
-        # Używamy .get(), aby uniknąć błędu AttributeError przy pierwszym uruchomieniu
         obecny_kod = st.session_state.get("current_code")
         
-        # Zabezpieczenie, żeby nie wylosować tego samego co przed chwilą (chyba że został tylko jeden)
         while len(dostepne) > 1 and nowy_kod == obecny_kod:
             nowy_kod = random.choice(dostepne)
             
@@ -122,17 +111,14 @@ def losuj_nowe():
         st.session_state.rated = False
         st.session_state.video_ended = False
 
-# Inicjalizacja pierwszego kodu, jeśli go nie ma
-# Używamy bezpiecznego sprawdzenia
 if st.session_state.get('current_code') is None:
     if not st.session_state.finished:
         losuj_nowe()
 
-# --- GŁÓWNA LOGIKA WYŚWIETLANIA ---
 
 if st.session_state.finished:
     # === ETAP 4: EKRAN KOŃCOWY (DZIĘKUJEMY) ===
-    st.balloons() # Efekt baloników
+    st.balloons()
     st.title("Badanie zakończone!")
     st.success("Udało Ci się ocenić wszystkie sekwencje wideo.")
     
@@ -144,7 +130,7 @@ if st.session_state.finished:
     
     Możesz teraz bezpiecznie zamknąć tę kartę przeglądarki.
     """)
-    st.stop() # Zatrzymuje dalsze wykonywanie skryptu
+    st.stop()
 
 elif not st.session_state.intro_accepted:
     # === ETAP 1: EKRAN POWITALNY / INSTRUKCJA ===
@@ -152,6 +138,7 @@ elif not st.session_state.intro_accepted:
     st.subheader("Dziękujemy za udział w teście.")
     
     st.markdown("""
+    Badanie to powinno zająć około 20 minut.
     Podczas eksperymentu na Twoim urządzeniu wyświetlane będą krótkie sekwencje wideo.
     Po obejrzeniu każdej sekwencji zostaniesz poproszony o ocenę jakości materiału.
     
@@ -227,7 +214,6 @@ elif st.session_state.user_id is None:
 else:
     # === ETAP 3: WŁAŚCIWY TEST WIDEO ===
     
-    # Upewniamy się, że mamy kod wideo (chyba że finished)
     if st.session_state.current_code is None and not st.session_state.finished:
         losuj_nowe()
         st.rerun()
@@ -239,13 +225,11 @@ else:
     total_videos = len(VIDEO_MAP)
 
     st.title("Badanie Jakości Wideo (QoE)")
-    # Pasek postępu tekstowy
     st.caption(f"ID: {st.session_state.user_id} | Wideo {progress_count} z {total_videos}")
     st.progress(len(st.session_state.watched_videos) / total_videos)
     
     st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
 
-    # Pobieramy URL
     filename = VIDEO_MAP.get(code, "out_bigBuckBunny_1920x1080_3000k.mp4")
     video_url = BASE_URL + filename
 
@@ -335,15 +319,8 @@ else:
     else:
         st.write("Ankieta pojawi się po zakończeniu wideo.")
         
-        # --- PRZYCISK AWARYJNY ---
         if st.button("Kliknij tutaj jeśli ankieta nie pojawi się automatycznie po filmie"):
             st.session_state.video_ended = True
             st.rerun()
             
         st.markdown('<style>iframe + div .stButton { opacity: 0; pointer-events: none; }</style>', unsafe_allow_html=True)
-
-    st.markdown("---")
-    # Przycisk "Pomiń" tylko losuje inny, NIE dodaje do obejrzanych (wraca do puli)
-    if st.button("Pomiń to wideo (losuj inne)"):
-        losuj_nowe()
-        st.rerun()
