@@ -243,7 +243,7 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- PLAYER WIDEO ---
+    # --- PLAYER WIDEO (Zaktualizowany JS) ---
     video_html = f"""
     <style>
         #start-btn {{
@@ -265,64 +265,68 @@ else:
     </div>
 
     <script>
-        function startVideo() {
+        function startVideo() {{
             var video = document.getElementById("my-video");
             var btn = document.getElementById("start-btn");
             video.style.display = "block";
             btn.style.display = "none";
             video.play();
-            if (video.requestFullscreen) { video.requestFullscreen(); }
-            else if (video.webkitRequestFullscreen) { video.webkitRequestFullscreen(); }
-        }
+            if (video.requestFullscreen) {{ video.requestFullscreen(); }}
+            else if (video.webkitRequestFullscreen) {{ video.webkitRequestFullscreen(); }}
+        }}
 
-        function checkFullscreen() {
+        function checkFullscreen() {{
             var video = document.getElementById("my-video");
             var btn = document.getElementById("start-btn");
             
             if (!document.fullscreenElement && !document.webkitFullscreenElement && 
-                !document.mozFullScreenElement && !document.msFullscreenElement) {
+                !document.mozFullScreenElement && !document.msFullscreenElement) {{
                 
-                if (!video.ended) {
+                if (!video.ended) {{
                     video.pause();
                     video.style.display = "none";
                     btn.style.display = "inline-block";
                     btn.innerHTML = "KONTYNUUJ ODTWARZANIE";
-                }
-            }
-        }
+                }}
+            }}
+        }}
 
         document.addEventListener('fullscreenchange', checkFullscreen);
         document.addEventListener('webkitfullscreenchange', checkFullscreen);
         document.addEventListener('mozfullscreenchange', checkFullscreen);
         document.addEventListener('msfullscreenchange', checkFullscreen);
         
-        document.getElementById("my-video").addEventListener('ended', function(e) {
-            if (document.exitFullscreen) { document.exitFullscreen(); }
-            else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+        document.getElementById("my-video").addEventListener('ended', function(e) {{
+            if (document.exitFullscreen) {{ document.exitFullscreen(); }}
+            else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
-            setTimeout(function() {
+            // --- AUTOMATYCZNE PRZEJŚCIE (Szukamy ukrytego przycisku) ---
+            setTimeout(function() {{
                 var buttons = window.parent.document.getElementsByTagName("button");
-                for (var i = 0; i < buttons.length; i++) {
-                    if (buttons[i].innerText.includes("###AUTO_NEXT###")) {
+                for (var i = 0; i < buttons.length; i++) {{
+                    // JS szuka przycisku o kodowej nazwie ###AUTO_NEXT###
+                    if (buttons[i].innerText.includes("###AUTO_NEXT###")) {{
                         buttons[i].click();
                         break;
-                    }
-                }
-            }, 500);
-        });
+                    }}
+                }}
+            }}, 500);
+        }});
     </script>
     """
     
+    # Wyświetlamy player tylko jeśli wideo się nie skończyło
     if not st.session_state.video_ended:
-        components.html(video_html, height=100)
+        components.html(video_html, height=400) # Zwiększyłem wysokość dla wygody
     else:
         st.success("Wideo zakończone. Proszę wypełnić ankietę poniżej.")
 
     st.markdown("---")
 
-    # --- OCENA ---
+    # --- OCENA I LOGIKA PRZEJŚCIA ---
     
     if st.session_state.video_ended:
+        # === EKRAN OCENY (Po zakończeniu wideo) ===
         st.header("Twoja ocena")
         if not st.session_state.rated:
             with st.form("rating_form"):
@@ -345,83 +349,74 @@ else:
                             st.rerun()
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
-   else:
+
+    else:
+        # === EKRAN OCZEKIWANIA / UKRYTY PRZYCISK (W trakcie wideo) ===
         st.write("Ankieta pojawi się automatycznie po zakończeniu wideo.")
         
         # --- UKRYTY MECHANIZM AUTOMATYCZNEGO PRZEJŚCIA ---
-        # Ten przycisk jest klikany przez JavaScript po zakończeniu filmu.
-        # Ukrywamy go CSS-em, żeby użytkownik nie mógł w niego kliknąć i pominąć filmu.
+        # Ten przycisk jest klikany przez JavaScript (powyżej) po zakończeniu filmu.
         
-        # Kod CSS sprawiający, że przycisk jest niewidoczny (opacity: 0) i nie zajmuje miejsca
-        st.markdown("""
-            <style>
-            div.stButton > button:first-child {
-                /* To jest ogólny styl, ale poniższy button ma unikalny tekst, 
-                   więc user go nie znajdzie łatwo, a CSS go ukryje */
-            }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # Używamy pustego kontenera, aby CSS mógł zadziałać lokalnie (w miarę możliwości)
-        # Hack: przycisk nazywa się "###AUTO_NEXT###", JS go szuka i klika.
-        # User widzi go jako pustą przestrzeń lub wcale (dzięki opacity w CSS poniżej).
-        
+        # 1. Tworzymy przycisk o unikalnej nazwie kodowej
+        # Używamy kolumn, żeby "zepchnąć" go na bok (choć i tak będzie ukryty)
         chk_col1, chk_col2 = st.columns([0.1, 99.9])
         with chk_col1:
-            # Nadajemy mu klucz, żeby nie mylił się z innymi
             if st.button("###AUTO_NEXT###", key="auto_trigger_btn"): 
                 st.session_state.video_ended = True
                 st.rerun()
 
-        # Twarde ukrywanie tego konkretnego przycisku
+        # 2. Kod CSS/JS sprawiający, że przycisk jest totalnie niewidoczny i nieklikalny dla człowieka
         st.markdown("""
             <script>
-                // Dodatkowe zabezpieczenie JS, gdyby CSS zawiódł
+                // Dodatkowe zabezpieczenie JS - ukrywa przycisk natychmiast po załadowaniu
                 const buttons = window.parent.document.getElementsByTagName("button");
                 for (const btn of buttons) {
                     if (btn.innerText.includes("###AUTO_NEXT###")) {
                         btn.style.opacity = "0";
+                        btn.style.position = "absolute"; 
                         btn.style.height = "0px";
                         btn.style.width = "0px";
                         btn.style.padding = "0px";
                         btn.style.border = "none";
                         btn.style.pointerEvents = "none"; // Blokuje kliknięcia myszką przez człowieka
+                        btn.style.zIndex = "-1";
                     }
                 }
             </script>
             <style>
-                /* Ukrywanie kolumny zawierającej przycisk */
-                [data-testid="column"]:has(div.stButton button:contains('###AUTO_NEXT###')) {
+                /* Ukrywanie kontenera przycisku w CSS */
+                div[data-testid="stVerticalBlock"] > div:has(button div p:contains('###AUTO_NEXT###')) {
                     display: none;
                 }
-                /* Alternatywne ukrywanie dla starszych przeglądarek - po prostu opacity na ten konkretny guzik */
-                button[kind="secondary"] p {
-                    color: transparent;
+                /* Alternatywa dla starszych przeglądarek */
+                button:has(p:contains('###AUTO_NEXT###')) {
+                    display: none;
                 }
             </style>
         """, unsafe_allow_html=True)
 
-# --- SEKCJA RATUNKOWA (PEŁNY RESET WIDEO) ---
+    # --- SEKCJA RATUNKOWA (PEŁNY RESET ZADANIA) ---
+    st.write("")
     st.write("")
     st.write("")
     
     with st.expander("⚠️ Masz problem techniczny? (Ekran się zaciął?)"):
         st.warning("""
-        Użyj tego przycisku, jeśli ekran zaciął się po ocenie lub wideo nie działa.
+        Użyj tego przycisku TYLKO, jeśli ekran zaciął się po ocenie lub wideo nie działa/nie ładuje się.
         
-        ⚠️ UWAGA: Kliknięcie przycisku ZRESETUJE obecne zadanie. 
-        Będziesz musiał(a) **obejrzeć wideo od nowa**, aby ankieta pojawiła się ponownie.
+        ⚠️ **UWAGA:** Kliknięcie przycisku ZRESETUJE obecne zadanie. 
+        Będziesz musiał(a) **obejrzeć to wideo od nowa**, aby ankieta pojawiła się ponownie.
         """)
         
-        if st.button("🔄 ZRESETUJ WIDEO (Wymaga ponownego obejrzenia)"):
+        if st.button("🔄 ZRESETUJ ZADANIE (Wymaga ponownego obejrzenia)"):
             # 1. Resetujemy status oceny (żeby zniknął komunikat "Wideo ocenione")
             st.session_state.rated = False
             
-            # 2. Resetujemy status zakończenia wideo (TO JEST KLUCZOWE)
+            # 2. Resetujemy status zakończenia wideo
             # Ustawienie False sprawia, że Streamlit ukryje formularz, a pokaże znowu Player HTML.
             st.session_state.video_ended = False
             
-            # 3. Nie zmieniamy kodu wideo - zostajemy na tym samym pliku.
+            # 3. Nie zmieniamy kodu wideo - użytkownik zostaje na tym samym pliku.
             
             # 4. Przeładowanie strony - user zobaczy znowu przycisk "ODTWÓRZ WIDEO"
             st.rerun()
