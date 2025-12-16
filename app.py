@@ -243,7 +243,6 @@ else:
 
     st.subheader(f"Sekwencja testowa: {code}")
 
-    # --- UKRYWANIE SIDEBARA (To likwiduje mignięcie) ---
     st.markdown("""
     <style>
         [data-testid="stSidebar"] { display: none !important; }
@@ -251,7 +250,6 @@ else:
     </style>
     """, unsafe_allow_html=True)
 
-    # --- PLAYER WIDEO I JS ---
     video_html = f"""
     <style>
         #start-btn {{
@@ -309,7 +307,6 @@ else:
             else if (document.webkitExitFullscreen) {{ document.webkitExitFullscreen(); }}
             
             setTimeout(function() {{
-                // Szukamy przycisku w ukrytym sidebarze
                 var sidebars = window.parent.document.querySelectorAll('[data-testid="stSidebar"]');
                 if (sidebars.length > 0) {{
                     var buttons = sidebars[0].getElementsByTagName("button");
@@ -328,7 +325,6 @@ else:
     if not st.session_state.video_ended:
         components.html(video_html, height=100)
         
-        # --- NIEWIDZIALNY PRZYCISK W SIDEBARZE ---
         with st.sidebar:
             if st.button("NEXT_STEP_TRIGGER"):
                 st.session_state.video_ended = True
@@ -367,9 +363,9 @@ else:
     # --- SEKCJA RATUNKOWA ---
     st.write("")
     st.write("")
-    with st.expander("⚠️ Wideo się zacięło lub ankieta nie działa?"):
+    with st.expander("Wideo się zacięło lub ankieta nie działa?"):
         st.warning("Kliknij poniżej, aby przeładować wideo i spróbować ponownie.")
-        if st.button("🔄 ZRESETUJ WIDEO"):
+        if st.button("ZRESETUJ WIDEO"):
             st.session_state.rated = False
             st.session_state.video_ended = False
             st.rerun()
