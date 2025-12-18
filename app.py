@@ -45,7 +45,7 @@ def save_rating(user_id, video_filename, rating):
         st.error(f"Błąd zapisu oceny: {e}")
         return False
 
-BASE_URL = "https://github.com/AntoniUlmaniec/video-qoe-test/releases/download/v1.0/"
+BASE_URL = "https://pub-06f5e0d0b2794648af3dc511ad0b8b72.r2.dev/"
 
 VIDEO_MAP = {
     "SEQ_01": "out_bigBuckBunny_1920x1080_3000k.mp4",
@@ -81,6 +81,8 @@ if 'user_id' not in st.session_state:
     st.session_state.user_id = None
 if 'video_ended' not in st.session_state:
     st.session_state.video_ended = False
+if 'reset_counter' not in st.session_state:
+    st.session_state.reset_counter = 0
 
 #PROGRESS TRACKING VARIABLES
 if 'watched_videos' not in st.session_state:
@@ -244,44 +246,100 @@ else:
     """, unsafe_allow_html=True)
 
     video_html = f"""
+    <!-- RESET_ID: {st.session_state.reset_counter} -->
     <style>
+        #video-container {{ position: relative; width: 100%; text-align: center; }}
         #start-btn {{
-            background-color: #FF4B4B; color: white; padding: 15px 32px;
+            background-color: #cccccc; color: #666666; padding: 15px 32px;
             text-align: center; display: inline-block; font-size: 16px;
-            margin: 4px 2px; cursor: pointer; border: none; border-radius: 4px;
-            width: 100%; font-weight: bold;
+            margin: 4px 2px; border: none; border-radius: 4px;
+            width: 100%; font-weight: bold; cursor: not-allowed;
+            pointer-events: none; transition: background-color 0.3s;
         }}
-        #start-btn:hover {{ background-color: #FF2B2B; }}
+        #start-btn.ready {{
+            background-color: #FF4B4B; color: white; cursor: pointer; pointer-events: auto;
+        }}
+        #start-btn.ready:hover {{ background-color: #FF2B2B; }}
         video::-webkit-media-controls-timeline {{ display: none !important; }}
         #my-video {{ display: none; width: 100%; }}
+        
+        #loading-status {{ margin-top: 10px; font-family: sans-serif; font-size: 14px; color: #555; }}
+        #progress-container {{ width: 100%; background-color: #e0e0e0; border-radius: 8px; margin-top: 5px; height: 10px; overflow: hidden; }}
+        #progress-bar {{ width: 0%; height: 100%; background-color: #4CAF50; transition: width 0.1s; }}
     </style>
 
     <div id="video-container">
-        <button id="start-btn" onclick="startVideo()">▶ ODTWÓRZ WIDEO</button>
+        <div id="loading-ui">
+            <button id="start-btn" onclick="startVideo()">POBIERANIE WIDEO...</button>
+            <div id="loading-status"><span id="percent-text">0%</span></div>
+            <div id="progress-container">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+
         <video id="my-video" controlsList="nodownload noplaybackrate">
-            <source src="{video_url}" type="video/mp4">
         </video>
     </div>
 
     <script>
+        var video = document.getElementById("my-video");
+        var btn = document.getElementById("start-btn");
+        var pBar = document.getElementById("progress-bar");
+        var pText = document.getElementById("percent-text");
+        var videoUrl = "{video_url}";
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", videoUrl, true);
+        xhr.responseType = "blob";
+
+        xhr.onprogress = function(event) {{
+            if (event.lengthComputable) {{
+                var percent = (event.loaded / event.total) * 100;
+                pBar.style.width = percent + "%";
+                pText.innerText = Math.round(percent) + "%";
+            }}
+        }};
+
+        xhr.onload = function(event) {{
+            if (xhr.status === 200) {{
+                var blob = xhr.response;
+                var blobUrl = URL.createObjectURL(blob);
+                
+                video.src = blobUrl;
+                
+                pBar.style.width = "100%";
+                pText.innerText = "100%";
+                enablePlayButton();
+            }} else {{
+                pText.innerText = "Błąd pobierania (" + xhr.status + ")";
+            }}
+        }};
+
+        xhr.onerror = function() {{ pText.innerText = "Błąd sieci."; }};
+        xhr.send();
+
+        function enablePlayButton() {{
+            btn.classList.add("ready");
+            btn.innerHTML = "ODTWÓRZ WIDEO";
+            pBar.style.backgroundColor = "#FF4B4B";
+        }}
+
         function startVideo() {{
-            var video = document.getElementById("my-video");
-            var btn = document.getElementById("start-btn");
+            document.getElementById("loading-status").style.display = "none";
+            document.getElementById("progress-container").style.display = "none";
+            
             video.style.display = "block";
             btn.style.display = "none";
             video.play();
+            
             if (video.requestFullscreen) {{ video.requestFullscreen(); }}
             else if (video.webkitRequestFullscreen) {{ video.webkitRequestFullscreen(); }}
         }}
 
         function checkFullscreen() {{
-            var video = document.getElementById("my-video");
-            var btn = document.getElementById("start-btn");
-            
             if (!document.fullscreenElement && !document.webkitFullscreenElement && 
                 !document.mozFullScreenElement && !document.msFullscreenElement) {{
-                
-                if (!video.ended) {{
+                if (!video.ended && video.currentTime > 0) {{ // Dodatkowe zabezpieczenie
                     video.pause();
                     video.style.display = "none";
                     btn.style.display = "inline-block";
@@ -357,7 +415,7 @@ else:
     else:
         st.write("Ankieta pojawi się automatycznie po zakończeniu wideo.")
 
-    #RESCUE
+    #RESCUE SECTION
     st.write("")
     st.write("")
     with st.expander("Wideo się zacięło lub ankieta nie działa?"):
@@ -365,4 +423,5 @@ else:
         if st.button("ZRESETUJ WIDEO"):
             st.session_state.rated = False
             st.session_state.video_ended = False
+            st.session_state.reset_counter += 1
             st.rerun()
