@@ -48,6 +48,9 @@ def save_rating(user_id, video_filename, rating):
 BASE_URL = "https://pub-06f5e0d0b2794648af3dc511ad0b8b72.r2.dev/"
 
 VIDEO_MAP = {
+    "TRAIN_01": "training-01.mp4",
+    "TRAIN_02": "training-02.mp4",
+
     "SEQ_01": "out_bigBuckBunny_1920x1080_3000k.mp4",
     "SEQ_02": "out_bigBuckBunny_1920x1080_3000k_withAD.mp4",
     "SEQ_03": "out_bigBuckBunny_256x144_100k.mp4",
@@ -83,6 +86,10 @@ if 'video_ended' not in st.session_state:
     st.session_state.video_ended = False
 if 'reset_counter' not in st.session_state:
     st.session_state.reset_counter = 0
+if 'training_done' not in st.session_state:
+    st.session_state.training_done = False 
+if 'training_step' not in st.session_state:
+    st.session_state.training_step = 0    
 
 #PROGRESS TRACKING VARIABLES
 if 'watched_videos' not in st.session_state:
@@ -92,8 +99,23 @@ if 'finished' not in st.session_state:
 
 #RANDOMIZATION LOGIC
 def pick_new_video():
+    if not st.session_state.training_done:
+        if st.session_state.training_step == 0:
+            st.session_state.current_code = "TRAIN_01"
+        elif st.session_state.training_step == 1:
+            st.session_state.current_code = "TRAIN_02"
+        else:
+            st.session_state.training_done = True
+            pick_new_video()
+            return
+
+        st.session_state.rated = False
+        st.session_state.video_ended = False
+        return
+
     all_codes = list(VIDEO_MAP.keys())
-    available_codes = [k for k in all_codes if k not in st.session_state.watched_videos]
+    real_codes = [k for k in all_codes if "TRAIN" not in k]
+    available_codes = [k for k in real_codes if k not in st.session_state.watched_videos]
     
     if not available_codes:
         st.session_state.finished = True
@@ -222,18 +244,33 @@ else:
     if st.session_state.current_code is None and not st.session_state.finished:
         pick_new_video()
         st.rerun()
-
+    
     code = st.session_state.current_code
     
-    # Progress counter
-    progress_count = len(st.session_state.watched_videos) + 1
-    total_videos = len(VIDEO_MAP)
+    if not st.session_state.training_done:
+        st.title("Faza Treningowa")
+        st.info("To jest wideo szkoleniowe. Zapoznaj się z procesem oceniania.")
 
-    st.title("Badanie Jakości Wideo (QoE)")
-    st.caption(f"ID: {st.session_state.user_id} | Wideo {progress_count} z {total_videos}")
-    st.progress(len(st.session_state.watched_videos) / total_videos)
-    
-    st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
+        train_current = st.session_state.training_step + 1
+        train_total = 2
+        
+        st.caption(f"ID: {st.session_state.user_id} | Wideo {train_current} z {train_total}")
+        st.progress(train_current / train_total)
+        
+    else:
+        progress_count = len(st.session_state.watched_videos) + 1
+        total_videos = len(VIDEO_MAP) - 2 
+        
+        if total_videos < 1: total_videos = 1
+        
+        current_progress = len(st.session_state.watched_videos) / total_videos
+        if current_progress > 1.0: current_progress = 1.0
+
+        st.title("Badanie Jakości Wideo (QoE)")
+        st.caption(f"ID: {st.session_state.user_id} | Wideo {progress_count} z {total_videos}")
+        st.progress(current_progress)
+        
+        st.info("Twoim zadaniem jest obejrzeć wyświetlony klip i ocenić jego jakość.")
 
     filename = VIDEO_MAP.get(code, "out_bigBuckBunny_1920x1080_3000k.mp4")
     video_url = BASE_URL + filename
@@ -401,15 +438,24 @@ else:
                     with st.spinner("Zapisuję..."):
                         rating_int = int(selected_rating.split(" - ")[0])
                         
-                        target_filename = VIDEO_MAP[code]
-                        save_success = save_rating(st.session_state.user_id, target_filename, rating_int)
-                        if save_success:
-                            st.success("Zapisano!")
-                            st.session_state.watched_videos.append(code)
+                        if not st.session_state.training_done:
+                            st.success("Ocena Treningowa przyjęta!")
+                            st.session_state.training_step += 1 
                             st.session_state.rated = True
                             time.sleep(1)
-                            pick_new_video()
+                            pick_new_video() 
                             st.rerun()
+                        else:
+                            target_filename = VIDEO_MAP[code]
+                            save_success = save_rating(st.session_state.user_id, target_filename, rating_int)
+                            
+                            if save_success:
+                                st.success("Zapisano!")
+                                st.session_state.watched_videos.append(code)
+                                st.session_state.rated = True
+                                time.sleep(1)
+                                pick_new_video()
+                                st.rerun()
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
     else:
