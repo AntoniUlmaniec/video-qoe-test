@@ -307,7 +307,7 @@ else:
 
     <div id="video-container">
         <div id="loading-ui">
-            <button id="start-btn" onclick="startVideo()">POBIERANIE WIDEO...</button>
+            <button id="start-btn" onclick="startVideo()">ŁADOWANIE WIDEO...</button>
             <div id="loading-status"><span id="percent-text">0%</span></div>
             <div id="progress-container">
                 <div id="progress-bar"></div>
