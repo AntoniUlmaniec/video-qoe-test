@@ -1,16 +1,2 @@
-# Ignoruj pliki z hasłami Streamlit (NAJWAŻNIEJSZE)
 .streamlit/secrets.toml
 secrets.toml
-
-# Ignoruj śmieci generowane przez Pythona (skompilowane pliki)
-__pycache__/
-*.pyc
-
-# Ignoruj środowiska wirtualne (jeśli będziesz ich używać)
-venv/
-env/
-.env
-
-# Ignoruj pliki systemowe Mac/Windows
-.DS_Store
-Thumbs.db
