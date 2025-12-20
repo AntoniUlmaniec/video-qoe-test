@@ -436,33 +436,40 @@ else:
                 
                 if submitted:
                     if code in st.session_state.watched_videos:
-                        st.warning("Ta ocena została już zapisana.")
+                        st.warning("Ta ocena została już przyjęta. Ładowanie kolejnego...")
                         time.sleep(1)
                         pick_new_video()
                         st.rerun()
 
                     else:
-                        with st.spinner("Zapisuję..."):
-                            rating_int = int(selected_rating.split(" - ")[0])
-                            
-                            if not st.session_state.training_done:
+                        rating_int = int(selected_rating.split(" - ")[0])
+                        
+                        if not st.session_state.training_done:
+                            with st.spinner("Zapisuję trening..."):
+                                time.sleep(0.5) # Symulacja czasu
                                 st.success("Ocena Treningowa przyjęta!")
                                 st.session_state.training_step += 1 
                                 st.session_state.rated = True
                                 time.sleep(1)
                                 pick_new_video() 
                                 st.rerun()
-                            else:
+                        
+                        else:
+                            st.session_state.watched_videos.append(code)
+
+                            with st.spinner("Zapisuję..."):
                                 target_filename = VIDEO_MAP[code]
                                 save_success = save_rating(st.session_state.user_id, target_filename, rating_int)
                                 
                                 if save_success:
                                     st.success("Zapisano!")
-                                    st.session_state.watched_videos.append(code)
                                     st.session_state.rated = True
                                     time.sleep(1)
                                     pick_new_video()
                                     st.rerun()
+                                else:
+                                    st.session_state.watched_videos.remove(code)
+                                    st.error("Błąd połączenia z bazą. Spróbuj kliknąć ponownie.")
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
     else:
