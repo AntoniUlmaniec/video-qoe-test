@@ -435,27 +435,34 @@ else:
                 submitted = st.form_submit_button("ZATWIERDŹ OCENĘ", type="primary")
                 
                 if submitted:
-                    with st.spinner("Zapisuję..."):
-                        rating_int = int(selected_rating.split(" - ")[0])
-                        
-                        if not st.session_state.training_done:
-                            st.success("Ocena Treningowa przyjęta!")
-                            st.session_state.training_step += 1 
-                            st.session_state.rated = True
-                            time.sleep(1)
-                            pick_new_video() 
-                            st.rerun()
-                        else:
-                            target_filename = VIDEO_MAP[code]
-                            save_success = save_rating(st.session_state.user_id, target_filename, rating_int)
+                    if code in st.session_state.watched_videos:
+                        st.warning("Ta ocena została już zapisana.")
+                        time.sleep(1)
+                        pick_new_video()
+                        st.rerun()
+
+                    else:
+                        with st.spinner("Zapisuję..."):
+                            rating_int = int(selected_rating.split(" - ")[0])
                             
-                            if save_success:
-                                st.success("Zapisano!")
-                                st.session_state.watched_videos.append(code)
+                            if not st.session_state.training_done:
+                                st.success("Ocena Treningowa przyjęta!")
+                                st.session_state.training_step += 1 
                                 st.session_state.rated = True
                                 time.sleep(1)
-                                pick_new_video()
+                                pick_new_video() 
                                 st.rerun()
+                            else:
+                                target_filename = VIDEO_MAP[code]
+                                save_success = save_rating(st.session_state.user_id, target_filename, rating_int)
+                                
+                                if save_success:
+                                    st.success("Zapisano!")
+                                    st.session_state.watched_videos.append(code)
+                                    st.session_state.rated = True
+                                    time.sleep(1)
+                                    pick_new_video()
+                                    st.rerun()
         else:
             st.info("Wideo ocenione. Ładowanie kolejnego...")
     else:
